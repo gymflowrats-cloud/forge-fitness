@@ -1,0 +1,11 @@
+node_modules
+dist
+dev-dist
+.DS_Store
+*.local
+.env
+.wrangler
+
+# personal screenshots (contain private finance info)
+design-reference/
+*.tsbuildinfo

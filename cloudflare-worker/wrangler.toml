@@ -1,0 +1,7 @@
+name = "forge-gemini"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+# Lock the proxy to your app's origin (comma-separate several). Leave "*" while testing.
+ALLOWED_ORIGIN = "*"
