@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
-import type { BodyWeight, Exercise, FoodLog, Measurement, Template, WeekSchedule, WorkoutSession, WorkoutSet } from '../../db/types';
+import type { WearableDay, BodyWeight, Exercise, FoodLog, Measurement, Template, WeekSchedule, WorkoutSession, WorkoutSet } from '../../db/types';
 import { todayKey } from '../../lib/dates';
 import { addDays } from '../../lib/stats';
 
@@ -20,12 +20,13 @@ export interface StatsData {
   weights: BodyWeight[];
   measurements: Measurement[];
   foodLogs: FoodLog[];
+  wearable: WearableDay[];
 }
 
 export function useStatsData(range: Range): StatsData | undefined {
   return useLiveQuery(async () => {
     const to = todayKey();
-    const [sessions, sets, exList, schedule, templates, weights, measurements, foodLogs] = await Promise.all([
+    const [sessions, sets, exList, schedule, templates, weights, measurements, foodLogs, wearable] = await Promise.all([
       db.workoutSessions.toArray(),
       db.sets.filter((s) => s.completed).toArray(),
       db.exercises.toArray(),
@@ -34,6 +35,7 @@ export function useStatsData(range: Range): StatsData | undefined {
       db.bodyWeights.orderBy('date').toArray(),
       db.measurements.orderBy('date').toArray(),
       db.foodLogs.toArray(),
+      db.wearableDays.orderBy('date').toArray(),
     ]);
     let days = RANGE_DAYS[range];
     if (range === 'All') {
@@ -42,7 +44,7 @@ export function useStatsData(range: Range): StatsData | undefined {
     }
     const from = addDays(to, -(days - 1));
     return {
-      from, to, prevFrom: addDays(from, -days), sessions, sets, exercises: new Map(exList.map((e) => [e.id, e])), schedule, templates, weights, measurements, foodLogs,
+      from, to, prevFrom: addDays(from, -days), sessions, sets, exercises: new Map(exList.map((e) => [e.id, e])), schedule, templates, weights, measurements, foodLogs, wearable,
     };
   }, [range]);
 }

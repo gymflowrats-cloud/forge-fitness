@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   Profile, Exercise, Template, WeekSchedule, WorkoutSession, SessionExercise, WorkoutSet,
-  Food, FoodLog, MealCombo, Water, BodyWeight, Measurement, Photo, CoachMessage, Setting,
+  Food, FoodLog, MealCombo, Water, BodyWeight, Measurement, Photo, CoachMessage, Setting, WearableDay,
 } from './types';
 
 export class ForgeDB extends Dexie {
@@ -21,6 +21,7 @@ export class ForgeDB extends Dexie {
   photos!: Table<Photo, string>;
   coachMessages!: Table<CoachMessage, string>;
   settings!: Table<Setting, string>;
+  wearableDays!: Table<WearableDay, string>;
 
   constructor() {
     super('forge');
@@ -43,6 +44,8 @@ export class ForgeDB extends Dexie {
       coachMessages: 'id, createdAt',
       settings: 'key',
     });
+    // v2: wearable (Fitbit / Google Health) daily summaries
+    this.version(2).stores({ wearableDays: 'date' });
   }
 }
 
@@ -50,6 +53,6 @@ export const db = new ForgeDB();
 
 export const ALL_TABLES = [
   'profile', 'exercises', 'templates', 'weekSchedule', 'workoutSessions', 'sessionExercises', 'sets',
-  'foods', 'foodLogs', 'mealCombos', 'water', 'bodyWeights', 'measurements', 'photos', 'coachMessages', 'settings',
+  'foods', 'foodLogs', 'mealCombos', 'water', 'bodyWeights', 'measurements', 'photos', 'coachMessages', 'settings', 'wearableDays',
 ] as const;
 export type TableName = (typeof ALL_TABLES)[number];

@@ -23,6 +23,9 @@ export interface AppSettings {
   dismissed: Record<string, string>;
   restSound: boolean;
   logView: 'focus' | 'list';
+  googleClientId: string;
+  lastHealthSync: string | null;
+  healthErrors: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +45,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dismissed: {},
   restSound: true,
   logView: 'focus',
+  googleClientId: '',
+  lastHealthSync: null,
+  healthErrors: {},
 };
 
 /** Keys never included in JSON backups. */

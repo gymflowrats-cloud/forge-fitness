@@ -12,7 +12,7 @@ export async function buildCoachContext() {
   const today = todayKey();
   const from = shiftKey(today, -27);
   const prevFrom = shiftKey(today, -55);
-  const [profile, templates, schedule, sessions, sets, exercises, weights, measurements, foodLogs] = await Promise.all([
+  const [profile, templates, schedule, sessions, sets, exercises, weights, measurements, foodLogs, wearable] = await Promise.all([
     db.profile.get('me'),
     db.templates.filter((t) => !t.archived).toArray().then((l) => l.sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))),
     db.weekSchedule.toArray(),
@@ -22,6 +22,7 @@ export async function buildCoachContext() {
     db.bodyWeights.orderBy('date').toArray(),
     db.measurements.orderBy('date').toArray(),
     db.foodLogs.where('date').aboveOrEqual(from).toArray(),
+    db.wearableDays.where('date').aboveOrEqual(shiftKey(today, -13)).toArray(),
   ]);
   const u = profile?.units ?? 'imperial';
   const W = (lb: number | null | undefined) => r1(toDispW(lb ?? null, u));
@@ -118,6 +119,11 @@ export async function buildCoachContext() {
       latestMeasurements: mPick(lastM),
       measurements4wAgo: mPick(oldM),
     },
+    wearable_fitbit_last_14_days: wearable.length
+      ? wearable
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((w) => ({ date: w.date, steps: w.steps, kcalBurned: w.caloriesOut, restingHr: w.restingHr, hrvMs: w.hrvMs, sleepMin: w.sleepMin }))
+      : 'not connected',
     nutrition_last_4_weeks: {
       daysLogged: dl.length, avgCalories: avg(dl.map((d) => d.c)), avgProteinG: avg(dl.map((d) => d.p)),
       daysProteinTargetHit: profile ? dl.filter((d) => d.p >= profile.proteinG * 0.95).length : null,
@@ -130,6 +136,7 @@ Rules:
 - Use ONLY the user's data provided in the JSON context below. Do not invent numbers. If the data is insufficient to answer, say so and say exactly what to log.
 - Be concise and specific: use concrete numbers, exercises, weights (in the user's units), sets and reps. Prefer short bullet points.
 - Apply established principles: progressive overload (add weight when the top of the rep range is hit for all sets), ~10-20 hard sets per muscle per week, 0.7-1 g protein per lb bodyweight, fat-loss ~0.5-1% bodyweight/week, lean gain ~0.25-0.5%/week, deload every 4-8 weeks or when performance stalls.
+- If Fitbit data is present, use sleep, resting heart rate and HRV trends to judge recovery (e.g. suggest lighter training after poor sleep or a rising resting HR), and use kcal burned vs. eaten for energy balance.
 - Never give medical advice or diagnose. If the user mentions pain, injury or a medical condition, recommend seeing a qualified professional (doctor or physiotherapist).
 - Format "reply" in Markdown.
 - When you recommend changing a target weight or rep range for an exercise that exists in the user's routine, ALSO add an entry to "suggestions" with the exact template and exercise names from the routine, using the user's weight unit. Otherwise leave "suggestions" empty.`;

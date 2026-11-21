@@ -193,3 +193,15 @@ export interface Setting {
   key: string;
   value: unknown;
 }
+
+/** One day of wearable data pulled from the Google Health API (Fitbit). */
+export interface WearableDay {
+  date: string; // YYYY-MM-DD
+  steps: number | null;
+  caloriesOut: number | null; // total kcal burned
+  restingHr: number | null;
+  avgHr: number | null;
+  hrvMs: number | null;
+  sleepMin: number | null;
+  syncedAt: string;
+}

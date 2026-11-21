@@ -9,6 +9,7 @@ import { initDb } from './db/init';
 import { getSettings } from './db/settings';
 import { useSettings } from './hooks/useData';
 import { setTheme } from './lib/theme';
+import { autoSync } from './services/googleHealth';
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 import Today from './features/today/Today';
 import Food from './features/food/Food';
@@ -24,6 +25,7 @@ import Preferences from './features/settings/Preferences';
 const AISettings = lazy(() => import('./features/settings/AISettings'));
 const Backup = lazy(() => import('./features/settings/Backup'));
 const Developer = lazy(() => import('./features/settings/Developer'));
+const HealthSettings = lazy(() => import('./features/settings/HealthSettings'));
 import ResetData from './features/settings/ResetData';
 
 function Shell({ onboarded }: { onboarded: boolean }) {
@@ -38,6 +40,13 @@ function Shell({ onboarded }: { onboarded: boolean }) {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [loc.pathname]);
+  // Pull fresh Fitbit data on open and whenever the app comes back to the foreground.
+  useEffect(() => {
+    autoSync();
+    const onVis = () => document.visibilityState === 'visible' && autoSync();
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
   const hideTabs = loc.pathname.startsWith('/onboarding');
   if (!isOnboarded && !hideTabs) return <Navigate to="/onboarding" replace />;
   return (
@@ -59,6 +68,7 @@ function Shell({ onboarded }: { onboarded: boolean }) {
         <Route path="/settings/ai" element={<AISettings />} />
         <Route path="/settings/backup" element={<Backup />} />
         <Route path="/settings/developer" element={<Developer />} />
+        <Route path="/settings/health" element={<HealthSettings />} />
         <Route path="/settings/reset" element={<ResetData />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>

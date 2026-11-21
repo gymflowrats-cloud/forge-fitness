@@ -88,6 +88,28 @@ If you'd rather keep the key off the phone, deploy the optional proxy in [`cloud
 
 ---
 
+## Fitbit / Google Health (optional)
+
+Forge can read your Fitbit (e.g. Fitbit Air) data through the **Google Health API**: steps, calories burned, average and resting heart rate, HRV and sleep. They show on Today, Food (calories burned vs eaten), Stats → Activity, and in the AI coach's context. Access is read-only, and synced data is stored only on your phone.
+
+One-time setup in [Google Cloud Console](https://console.cloud.google.com/). The in-app page at **Settings → Fitbit (Google Health)** shows the same steps with copy buttons.
+
+1. Create a project and enable the **Google Health API**.
+2. Go to **Google Auth Platform**. Set Audience to **External**, status to **Testing**, and add your Google email as a **test user**.
+3. In **Data Access**, add the three `googlehealth.*.readonly` scopes: `activity_and_fitness`, `health_metrics_and_measurements`, and `sleep`.
+4. Under **Clients**, create a **Web application** client:
+   - Authorized JavaScript origins: `https://<you>.github.io` (and `http://localhost:5173` for development).
+   - Authorized redirect URIs: `https://<you>.github.io/<repo>/` (and `http://localhost:5173/`).
+5. Paste the **Client ID** into Forge and tap **Connect**.
+
+How it works and its limits:
+- Sign-in uses Google's browser (implicit) OAuth flow. There's no server and no client secret.
+- Google sessions last about an hour. Forge syncs automatically when you open it while signed in; after that, use **Connect** or **Quick reconnect** (one tap).
+- In Testing mode, Google only allows the test users you list.
+- Your Fitbit must already sync to the Google Health app. Otherwise the API returns `ACCOUNT_NOT_LINKED`.
+
+---
+
 ## Back up your data (important)
 
 All data lives in IndexedDB on your phone. If you delete the home-screen app, clear Safari website data, or lose the phone, the data is gone.

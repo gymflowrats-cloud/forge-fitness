@@ -24,6 +24,7 @@ import { ExerciseCard } from './ExerciseCard';
 import { FinishSheet } from './FinishSheet';
 import { FocusLogger } from './FocusLogger';
 import { RestTimerBar } from './RestTimerBar';
+import { WearableCard } from '../../components/WearableCard';
 
 export default function Today() {
   const nav = useNavigate();
@@ -161,6 +162,7 @@ export default function Today() {
       </div>
 
       <div className="mt-4 space-y-3">
+        <WearableCard date={date} />
         <DateChips value={date} onChange={setDate} />
         <ChipRow>
           {templates.map((t) => (

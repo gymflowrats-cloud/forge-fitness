@@ -21,6 +21,7 @@ export default function Food() {
   const [date, setDate] = useState(todayKey());
   const logs = useLiveQuery(() => db.foodLogs.where('date').equals(date).toArray(), [date], [] as FoodLog[]) ?? [];
   const water = useLiveQuery(() => db.water.get(date), [date]);
+  const wear = useLiveQuery(() => db.wearableDays.get(date), [date]);
   const [adding, setAdding] = useState(false);
   const [meal, setMeal] = useState(defaultMealForNow(s.meals));
   const [menuMeal, setMenuMeal] = useState<string | null>(null);
@@ -77,6 +78,15 @@ export default function Food() {
           ))}
         </div>
       </HeroCard>
+
+      {wear?.caloriesOut != null && (
+        <div className="card mt-3 px-5 py-3 flex items-center justify-between text-[14px]">
+          <span className="text-muted">Fitbit burned <b className="text-ink tabular">{fmtInt(wear.caloriesOut)}</b> kcal{isToday ? ' so far' : ''}</span>
+          <span className={`font-bold tabular ${t.calories - wear.caloriesOut > 0 ? 'text-danger' : 'text-success'}`}>
+            Net {t.calories - wear.caloriesOut > 0 ? '+' : '−'}{fmtInt(Math.abs(t.calories - wear.caloriesOut))}
+          </span>
+        </div>
+      )}
 
       <div className="mt-4 space-y-3">
         {over && <AlertRow tone="danger">You're <b>{fmtInt(-remaining)} kcal over</b> your goal{isToday ? ' today' : ''}.</AlertRow>}

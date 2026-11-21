@@ -1,4 +1,4 @@
-import { ChevronRight, CalendarDays, Database, Dumbbell, Library, Palette, Sparkles, User, Wrench, AlertTriangle } from 'lucide-react';
+import { ChevronRight, CalendarDays, Database, Dumbbell, HeartPulse, Library, Palette, Sparkles, User, Wrench, AlertTriangle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BackHeader, Page } from '../../components/Layout';
@@ -31,6 +31,7 @@ export default function SettingsHome() {
         </div>
         <div className="card divide-y divide-line overflow-hidden">
           <Row to="/settings/preferences" icon={<Palette size={20} />} title="Units, theme & logging" sub={`${p?.units === 'metric' ? 'kg / cm' : 'lb / in'} · ${s.theme} theme`} />
+          <Row to="/settings/health" icon={<HeartPulse size={20} />} title="Fitbit (Google Health)" sub={s.lastHealthSync ? `Last sync ${new Date(s.lastHealthSync).toLocaleString()}` : 'Steps, calories, heart rate, sleep'} />
           <Row to="/settings/ai" icon={<Sparkles size={20} />} title="AI coach (Gemini)" sub={s.geminiKey || s.proxyUrl ? `Connected · ${s.geminiModel}` : 'Not set up'} />
           <Row to="/settings/backup" icon={<Database size={20} />} title="Backup & export" sub={s.lastBackupAt ? `Last backup ${new Date(s.lastBackupAt).toLocaleDateString()}` : 'Never backed up'} />
         </div>
