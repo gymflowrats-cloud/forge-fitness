@@ -93,7 +93,7 @@ export default function Body() {
             </HeroPill>
           )}
         </div>
-        <div className="text-[52px] font-extrabold tracking-tight tabular leading-tight">
+        <div className="num text-[56px] font-extrabold tracking-tight tabular leading-tight">
           {latest ? fmtNum(toDispW(latest.weight, units)) : '—'} <span className="text-[22px] text-white/70">{wUnit(units)}</span>
         </div>
         <HeroSplit

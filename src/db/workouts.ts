@@ -53,7 +53,7 @@ async function addSessionExercise(session: WorkoutSession, te: TemplateExercise,
   const seId = uid();
   const se: SessionExercise = {
     id: seId, sessionId: session.id, exerciseId: te.exerciseId, order, isExtra, note: '',
-    restSec: te.restSec, targetRepsMin: te.targetRepsMin, targetRepsMax: te.targetRepsMax,
+    restSec: te.restSec, targetRepsMin: te.targetRepsMin, targetRepsMax: te.targetRepsMax, group: te.group ?? null,
   };
   // Carry over last note for this exercise (e.g. "seat height 4")
   const prevSe = (await db.sessionExercises.where('exerciseId').equals(te.exerciseId).toArray()).filter((x) => x.note && x.sessionId !== session.id).pop();
@@ -285,3 +285,61 @@ export const bestSetLabel = (sets: WorkoutSet[]) => {
   const best = [...sets].sort((a, b) => e1rm(b.weight || 0, b.reps || 0) - e1rm(a.weight || 0, a.reps || 0))[0];
   return best;
 };
+
+/** Insert warm-up sets (weights in lb) before the existing sets of a session exercise. */
+export async function addWarmupSets(seId: string, ramp: { weight: number; reps: number }[]) {
+  if (!ramp.length) return;
+  await db.transaction('rw', db.sets, db.sessionExercises, db.workoutSessions, async () => {
+    const se = await db.sessionExercises.get(seId);
+    if (!se) return;
+    const session = await db.workoutSessions.get(se.sessionId);
+    const existing = await db.sets.where('sessionExerciseId').equals(seId).sortBy('order');
+    for (const s of existing) await db.sets.update(s.id, { order: s.order + ramp.length });
+    await db.sets.bulkAdd(
+      ramp.map((r, i) => ({
+        id: uid(), sessionExerciseId: seId, sessionId: se.sessionId, exerciseId: se.exerciseId, order: i, setType: 'warmup' as SetType,
+        weight: r.weight, reps: r.reps, durationSec: null, distance: null, calories: null, completed: false, completedAt: null, isPR: false, date: session?.date,
+      })),
+    );
+  });
+}
+
+/** Apply per-set targets (lb) to the not-yet-done working sets of a session exercise, in order. */
+export async function applyToOpenWorkingSets(seId: string, targets: { weight: number | null; reps: number }[]) {
+  if (!targets.length) return;
+  const working = (await db.sets.where('sessionExerciseId').equals(seId).sortBy('order')).filter((s) => s.setType !== 'warmup');
+  await db.transaction('rw', db.sets, async () => {
+    for (let k = 0; k < working.length; k++) {
+      const s = working[k]!;
+      if (s.completed) continue;
+      const t = targets[Math.min(k, targets.length - 1)]!;
+      await db.sets.update(s.id, { weight: t.weight, reps: t.reps });
+    }
+  });
+}
+
+/**
+ * Toggle a superset between this session exercise and the next one (by order).
+ * If it is already in a group, it leaves the group (a group of one is dissolved).
+ */
+export async function toggleSupersetWithNext(seId: string): Promise<string | null> {
+  return db.transaction('rw', db.sessionExercises, async () => {
+    const se = await db.sessionExercises.get(seId);
+    if (!se) return null;
+    const list = (await db.sessionExercises.where('sessionId').equals(se.sessionId).sortBy('order')).filter((x) => !x.skipped);
+    if (se.group) {
+      const g = se.group;
+      await db.sessionExercises.update(se.id, { group: null });
+      const left = list.filter((x) => x.group === g && x.id !== se.id);
+      if (left.length === 1) await db.sessionExercises.update(left[0]!.id, { group: null });
+      return 'Superset removed';
+    }
+    const i = list.findIndex((x) => x.id === se.id);
+    const next = list[i + 1];
+    if (!next) return 'Add another exercise after this one to make a superset';
+    const g = next.group ?? uid();
+    await db.sessionExercises.update(se.id, { group: g });
+    await db.sessionExercises.update(next.id, { group: g });
+    return 'Superset linked. Sets now alternate.';
+  });
+}

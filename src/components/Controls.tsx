@@ -55,7 +55,7 @@ export function ProgressBar({ value, max = 1, tone = 'primary', className = '', 
   value: number; max?: number; tone?: 'primary' | 'danger' | 'success' | 'warn'; className?: string; light?: boolean;
 }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
-  const fill = light ? 'bg-white' : { primary: 'bg-primary', danger: 'bg-danger', success: 'bg-success', warn: 'bg-warn' }[tone];
+  const fill = light ? 'bg-accent' : { primary: 'bg-primary', danger: 'bg-danger', success: 'bg-success', warn: 'bg-warn' }[tone];
   return (
     <div className={`h-2.5 rounded-full overflow-hidden ${light ? 'bg-white/20' : 'bg-track'} ${className}`}>
       <div className={`h-full rounded-full transition-[width] duration-500 ${fill}`} style={{ width: `${pct}%` }} />

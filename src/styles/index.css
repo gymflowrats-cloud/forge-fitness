@@ -3,13 +3,22 @@
 @import '@fontsource/plus-jakarta-sans/latin-600.css';
 @import '@fontsource/plus-jakarta-sans/latin-700.css';
 @import '@fontsource/plus-jakarta-sans/latin-800.css';
+@import '@fontsource/barlow-condensed/latin-600.css';
+@import '@fontsource/barlow-condensed/latin-700.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ---------- Palettes ----------
+   primary = structure (headers, chips, text accents), accent = things you tap + progress.
+   Each palette sets light values on html[data-palette] and dark values on html.dark[data-palette]. */
 :root {
   --c-primary: 54 73 59;      /* #36493B */
+  --c-accent: 54 73 59;
+  --c-accent-ink: 255 255 255;
+  --c-hero-from: 62 84 68;
+  --c-hero-to: 44 59 48;
   --c-bg: 245 244 240;        /* #F5F4F0 */
   --c-card: 255 255 255;
   --c-line: 232 230 224;      /* #E8E6E0 */
@@ -18,6 +27,7 @@
   --c-danger: 155 66 52;      /* #9B4234 */
   --c-success: 63 107 74;     /* #3F6B4A */
   --c-warn: 208 138 46;       /* #D08A2E */
+  --c-gold: 214 160 42;
   --c-ink: 28 28 26;          /* #1C1C1A */
   --c-muted: 107 107 102;     /* #6B6B66 */
   --chart-grid: #E8E6E0;
@@ -27,6 +37,10 @@
 
 html.dark {
   --c-primary: 74 99 80;
+  --c-accent: 74 99 80;
+  --c-accent-ink: 255 255 255;
+  --c-hero-from: 52 72 58;
+  --c-hero-to: 34 46 38;
   --c-bg: 22 24 22;
   --c-card: 32 35 33;
   --c-line: 48 52 49;
@@ -35,11 +49,60 @@ html.dark {
   --c-danger: 214 112 94;
   --c-success: 118 176 132;
   --c-warn: 230 165 80;
+  --c-gold: 236 186 80;
   --c-ink: 240 239 235;
   --c-muted: 160 160 152;
   --chart-grid: #303431;
   --chart-axis: #8f918a;
   color-scheme: dark;
+}
+
+/* Forest + amber */
+html[data-palette='amber'] {
+  --c-primary: 47 69 53; --c-accent: 224 160 64; --c-accent-ink: 43 32 16;
+  --c-hero-from: 58 84 66; --c-hero-to: 36 53 42;
+  --c-bg: 244 241 234; --c-soft: 236 232 220; --c-line: 230 225 213; --c-track: 236 232 222;
+}
+html.dark[data-palette='amber'] {
+  --c-primary: 78 108 86; --c-accent: 232 172 82; --c-accent-ink: 36 26 10;
+  --c-hero-from: 50 74 58; --c-hero-to: 30 44 35;
+  --c-bg: 21 23 20; --c-card: 32 34 30; --c-soft: 44 44 36; --c-line: 50 51 45; --c-track: 45 46 40;
+}
+
+/* Terracotta */
+html[data-palette='terracotta'] {
+  --c-primary: 142 63 34; --c-accent: 192 88 47; --c-accent-ink: 255 255 255;
+  --c-hero-from: 176 80 45; --c-hero-to: 118 50 24;
+  --c-bg: 246 239 230; --c-soft: 240 226 212; --c-line: 234 222 207; --c-track: 238 228 216;
+}
+html.dark[data-palette='terracotta'] {
+  --c-primary: 196 104 66; --c-accent: 214 110 66; --c-accent-ink: 255 255 255;
+  --c-hero-from: 140 62 34; --c-hero-to: 86 36 18;
+  --c-bg: 25 21 19; --c-card: 37 32 29; --c-soft: 52 40 33; --c-line: 56 47 42; --c-track: 50 42 37;
+}
+
+/* Deep ocean */
+html[data-palette='ocean'] {
+  --c-primary: 31 78 95; --c-accent: 224 122 95; --c-accent-ink: 255 255 255;
+  --c-hero-from: 38 89 107; --c-hero-to: 23 59 72;
+  --c-bg: 238 243 242; --c-soft: 222 234 234; --c-line: 218 228 227; --c-track: 226 234 233;
+}
+html.dark[data-palette='ocean'] {
+  --c-primary: 70 130 150; --c-accent: 232 136 110; --c-accent-ink: 255 255 255;
+  --c-hero-from: 30 74 90; --c-hero-to: 17 46 57;
+  --c-bg: 17 22 24; --c-card: 27 34 37; --c-soft: 32 45 50; --c-line: 42 52 56; --c-track: 37 47 51;
+}
+
+/* Plum + peach */
+html[data-palette='plum'] {
+  --c-primary: 78 53 82; --c-accent: 232 149 90; --c-accent-ink: 58 32 16;
+  --c-hero-from: 90 61 95; --c-hero-to: 54 35 58;
+  --c-bg: 247 241 238; --c-soft: 238 228 232; --c-line: 233 224 222; --c-track: 238 230 228;
+}
+html.dark[data-palette='plum'] {
+  --c-primary: 140 104 146; --c-accent: 238 160 104; --c-accent-ink: 50 28 12;
+  --c-hero-from: 74 50 80; --c-hero-to: 44 28 48;
+  --c-bg: 23 20 24; --c-card: 35 31 36; --c-soft: 48 38 50; --c-line: 53 46 54; --c-track: 47 41 48;
 }
 
 html, body, #root { height: 100%; }
@@ -56,7 +119,7 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
 
 @layer components {
   .card { @apply bg-card border border-line rounded-card shadow-card; }
-  .btn-primary { @apply w-full min-h-[52px] rounded-btn bg-primary text-white font-bold text-[17px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40; }
+  .btn-primary { @apply w-full min-h-[52px] rounded-btn bg-accent text-accent-ink font-bold text-[17px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40; }
   .btn-secondary { @apply min-h-[44px] rounded-full bg-track text-ink font-semibold px-4 flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform; }
   .btn-ghost { @apply min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center active:bg-track transition-colors; }
   .input { @apply w-full min-h-[52px] rounded-btn bg-card border border-line px-4 text-[16px] text-ink placeholder:text-muted/70 outline-none focus:border-primary transition-colors; }
@@ -68,7 +131,22 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
   .tabular { font-variant-numeric: tabular-nums; }
+  /* Big scoreboard-style numbers (only when "Sporty numbers" is on). */
+  html.sporty .num { font-family: 'Barlow Condensed', 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 700; letter-spacing: 0.005em; font-variant-numeric: tabular-nums; }
+  /* Hero surface: palette gradient + soft accent glow + faint grain. */
+  .hero-surface {
+    background-color: rgb(var(--c-hero-to));
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(120% 90% at 100% 0%, rgb(var(--c-accent) / 0.28), transparent 55%),
+      linear-gradient(135deg, rgb(var(--c-hero-from)), rgb(var(--c-hero-to)));
+  }
+  html.flat-hero .hero-surface { background-image: linear-gradient(135deg, rgb(var(--c-hero-from)), rgb(var(--c-hero-to))); }
 }
+
+/* Confetti */
+@keyframes forge-confetti { 0% { transform: translate3d(0,0,0) rotate(0); opacity: 1; } 100% { transform: translate3d(var(--dx), 105vh, 0) rotate(var(--rot)); opacity: .9; } }
+.confetti-piece { position: fixed; top: -12px; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; z-index: 100; animation: forge-confetti var(--dur) cubic-bezier(.25,.6,.4,1) forwards; }
 
 .md p { margin: 0.4em 0; }
 .md ul { list-style: disc; padding-left: 1.2em; margin: 0.4em 0; }

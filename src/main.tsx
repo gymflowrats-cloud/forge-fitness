@@ -2,13 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/index.css';
 import App from './App';
-import { setTheme } from './lib/theme';
+import { restoreLook, setTheme } from './lib/theme';
 import { handleAuthRedirect } from './services/googleHealth';
 
 // Returning from Google sign-in? Store the token and clean the URL before the router reads it.
 handleAuthRedirect();
 
 setTheme('system');
+restoreLook();
 
 // Ask iOS/Chrome to keep our IndexedDB around (best effort).
 if (navigator.storage?.persist) {

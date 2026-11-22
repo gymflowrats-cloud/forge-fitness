@@ -2,7 +2,8 @@ import { DndContext, PointerSensor, TouchSensor, KeyboardSensor, closestCenter, 
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Copy, GripVertical, Link2, Plus, Trash2 } from 'lucide-react';
+import { uid } from '../../lib/id';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Field, Stepper } from '../../components/Controls';
@@ -58,6 +59,25 @@ export default function TemplateEditor() {
   );
 
   if (!t) return <Page><BackHeader title="Template" /></Page>;
+
+  /** Flip the superset link between exercise i and i+1, then re-number contiguous linked runs. */
+  async function toggleLink(i: number) {
+    const list = t!.exercises;
+    const links = list.slice(0, -1).map((te, k) => !!te.group && te.group === list[k + 1]!.group);
+    links[i] = !links[i];
+    const out = list.map((te) => ({ ...te, group: null as string | null }));
+    let k = 0;
+    while (k < out.length) {
+      let end = k;
+      while (end < links.length && links[end]) end++;
+      if (end > k) {
+        const g = uid();
+        for (let m = k; m <= end; m++) out[m]!.group = g;
+      }
+      k = end + 1;
+    }
+    await saveTemplateExercises(t!.id, out);
+  }
   const ids = t.exercises.map((e) => e.exerciseId);
 
   const onDragEnd = (e: DragEndEvent) => {
@@ -113,9 +133,25 @@ export default function TemplateEditor() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={ids} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
-                {t.exercises.map((te, i) => (
-                  <SortRow key={te.exerciseId} id={te.exerciseId} te={te} ex={exMap.get(te.exerciseId)} unitLabel={wUnit(units)} weightDisp={toDispW(te.targetWeight, units)} onEdit={() => openEdit(i)} />
-                ))}
+                {t.exercises.map((te, i) => {
+                  const next = t.exercises[i + 1];
+                  const linked = !!te.group && next?.group === te.group;
+                  return (
+                    <div key={te.exerciseId}>
+                      <SortRow id={te.exerciseId} te={te} ex={exMap.get(te.exerciseId)} unitLabel={wUnit(units)} weightDisp={toDispW(te.targetWeight, units)} onEdit={() => openEdit(i)} />
+                      {next && (
+                        <div className="flex justify-center -my-1 relative z-[1]">
+                          <button
+                            onClick={() => toggleLink(i)}
+                            className={`min-h-[34px] rounded-full px-3 text-[12px] font-bold flex items-center gap-1 border ${linked ? 'bg-accent text-accent-ink border-accent' : 'bg-bg text-muted border-line border-dashed'}`}
+                          >
+                            <Link2 size={13} /> {linked ? 'Superset' : 'Make superset'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>

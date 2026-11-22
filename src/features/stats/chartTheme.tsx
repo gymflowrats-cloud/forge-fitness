@@ -25,10 +25,17 @@ function read(): ChartColors {
   const st = getComputedStyle(document.documentElement);
   const rgb = (v: string) => `rgb(${st.getPropertyValue(v).trim().split(/\s+/).join(',')})`;
   const dark = document.documentElement.classList.contains('dark');
+  // Single-series colour follows the palette; lifted toward white in dark mode for contrast.
+  const tri = (v: string) => st.getPropertyValue(v).trim().split(/\s+/).map(Number);
+  const mix = (a: number[], b: number[], t: number) => a.map((x, i) => Math.round(x + ((b[i] ?? 0) - x) * t));
+  const css = (c: number[]) => `rgb(${c.join(',')})`;
+  const base = tri('--c-primary');
+  const prim = dark ? mix(base, [255, 255, 255], 0.4) : base;
+  const track = tri('--c-track');
   return {
     dark,
-    primary: dark ? '#7FA889' : '#36493B',
-    primarySoft: dark ? 'rgba(127,168,137,0.25)' : 'rgba(54,73,59,0.18)',
+    primary: css(prim),
+    primarySoft: `rgba(${prim.join(',')},${dark ? 0.25 : 0.18})`,
     grid: st.getPropertyValue('--chart-grid').trim() || '#E8E6E0',
     axis: st.getPropertyValue('--chart-axis').trim() || '#8A8A84',
     ink: rgb('--c-ink'),
@@ -39,7 +46,7 @@ function read(): ChartColors {
     warn: rgb('--c-warn'),
     other: dark ? '#6f716c' : '#a8a79f',
     cat: dark ? CAT_DARK : CAT_LIGHT,
-    heat: dark ? ['#2a2f2b', '#2f4a36', '#3f6b4a', '#5d9068', '#8fc49a'] : ['#ECEBE6', '#c9d8cc', '#93b39b', '#5a8264', '#2f4a36'],
+    heat: [0, 0.3, 0.55, 0.78, 1].map((t) => css(mix(track, prim, t))),
   };
 }
 
@@ -47,7 +54,7 @@ export function useChartColors(): ChartColors {
   const [c, setC] = useState(read);
   useEffect(() => {
     const obs = new MutationObserver(() => setC(read()));
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-palette'] });
     return () => obs.disconnect();
   }, []);
   return c;
@@ -114,7 +121,7 @@ export function StatTile({ label, value, sub, tone }: { label: string; value: Re
   return (
     <div className="card p-4 min-w-0">
       <div className="text-[13px] text-muted">{label}</div>
-      <div className={`text-[24px] font-extrabold tabular leading-tight truncate ${tone === 'good' ? 'text-success' : tone === 'bad' ? 'text-danger' : ''}`}>{value}</div>
+      <div className={`num text-[26px] font-extrabold tabular leading-tight truncate ${tone === 'good' ? 'text-success' : tone === 'bad' ? 'text-danger' : ''}`}>{value}</div>
       {sub && <div className="text-[12px] text-muted mt-0.5">{sub}</div>}
     </div>
   );

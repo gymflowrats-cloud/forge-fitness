@@ -12,7 +12,7 @@ export function Card({ className = '', children, ...rest }: HTMLAttributes<HTMLD
 export function HeroCard({ className = '', children }: { className?: string; children: ReactNode }) {
   return (
     <div
-      className={`rounded-card p-6 text-white shadow-float bg-gradient-to-br from-hero-from to-hero-to ${className}`}
+      className={`rounded-card p-6 text-white shadow-float hero-surface ${className}`}
     >
       {children}
     </div>
@@ -26,7 +26,7 @@ export function HeroSplit({ items }: { items: { label: string; value: ReactNode;
         <div key={it.label} className={`flex-1 min-w-0 ${i > 0 ? 'pl-5 border-l border-white/15' : 'pr-2'}`}>
           <div className="text-[13px] text-white/70 truncate">{it.label}</div>
           <div
-            className={`text-[19px] font-bold tabular truncate ${
+            className={`num text-[19px] font-bold tabular truncate ${
               it.tone === 'danger' ? 'text-[#E8B1A6]' : it.tone === 'success' ? 'text-[#B9DDBF]' : ''
             }`}
           >
@@ -62,7 +62,7 @@ export function StatCard({
     <Comp onClick={onClick} className="card p-5 text-left flex-1 min-w-0 active:scale-[0.98] transition-transform">
       <div className={`h-11 w-11 rounded-full flex items-center justify-center ${tint}`}>{icon}</div>
       <div className="mt-3 text-[15px] text-muted">{label}</div>
-      <div className={`text-[26px] font-extrabold leading-tight tabular truncate ${valueColor}`}>{value}</div>
+      <div className={`num text-[26px] font-extrabold leading-tight tabular truncate ${valueColor}`}>{value}</div>
       {sub && <div className="text-[13px] text-muted mt-0.5">{sub}</div>}
     </Comp>
   );

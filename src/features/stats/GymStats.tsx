@@ -11,6 +11,7 @@ import { addDays, changeOver, exerciseProgress, mondayOf, perWeek, setsPerMuscle
 import { toDispW, wUnit, type Units } from '../../lib/units';
 import { ChartCard, InsightCard, StatTile, TipBox, axisProps, useChartColors } from './chartTheme';
 import type { StatsData } from './useStatsData';
+import { MuscleMap } from './MuscleMap';
 
 const wk = (k: string) => prettyDate(k, 'MMM d');
 
@@ -195,6 +196,10 @@ export function GymStats({ d, units }: { d: StatsData; units: Units }) {
             </div>
           </div>
         )}
+      </ChartCard>
+
+      <ChartCard title="Muscle map this week" sub="Brighter = more working sets · aim for 10–20 per muscle">
+        <MuscleMap perMuscle={perMuscle} c={c} />
       </ChartCard>
 
       <ChartCard title="Muscle split this week" sub="Working sets · secondary muscles count ½ · target 10–20">

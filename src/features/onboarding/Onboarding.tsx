@@ -80,7 +80,7 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-full flex flex-col bg-bg">
-      <div className="rounded-b-[32px] bg-gradient-to-br from-hero-from to-hero-to text-white px-6 pb-8" style={{ paddingTop: 'max(env(safe-area-inset-top), 24px)' }}>
+      <div className="rounded-b-[32px] hero-surface text-white px-6 pb-8" style={{ paddingTop: 'max(env(safe-area-inset-top), 24px)' }}>
         <div className="flex items-center justify-between mt-6">
           <div className="h-16 w-16 rounded-[20px] bg-white text-primary flex items-center justify-center">
             <Dumbbell size={34} strokeWidth={2.4} />

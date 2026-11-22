@@ -2,13 +2,14 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toaster } from './components/Feedback';
+import { CelebrationLayer } from './components/Celebrate';
 import { TabBar } from './components/Layout';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/db';
 import { initDb } from './db/init';
 import { getSettings } from './db/settings';
 import { useSettings } from './hooks/useData';
-import { setTheme } from './lib/theme';
+import { setLook, setTheme, type Palette } from './lib/theme';
 import { autoSync } from './services/googleHealth';
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 import Today from './features/today/Today';
@@ -16,6 +17,9 @@ import Food from './features/food/Food';
 import Body from './features/body/Body';
 const Stats = lazy(() => import('./features/stats/Stats'));
 const Coach = lazy(() => import('./features/coach/Coach'));
+const Achievements = lazy(() => import('./features/achievements/Achievements'));
+const WeeklyRecap = lazy(() => import('./features/recap/WeeklyRecap'));
+import { AchievementWatcher } from './features/achievements/AchievementWatcher';
 import SettingsHome from './features/settings/SettingsHome';
 import ProfileSettings from './features/settings/ProfileSettings';
 import Routines from './features/settings/Routines';
@@ -37,6 +41,13 @@ function Shell({ onboarded }: { onboarded: boolean }) {
   useEffect(() => {
     setTheme(settings.theme);
   }, [settings.theme]);
+  // Undefined while loading, so the defaults never briefly override the saved look.
+  const look = useLiveQuery(() => getSettings().then((x) => `${x.palette}|${x.sportyNumbers}|${x.heroTexture}`), []);
+  useEffect(() => {
+    if (!look) return;
+    const [palette, sporty, texture] = look.split('|');
+    setLook({ palette: palette as Palette, sporty: sporty === 'true', texture: texture === 'true' });
+  }, [look]);
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [loc.pathname]);
@@ -59,6 +70,8 @@ function Shell({ onboarded }: { onboarded: boolean }) {
         <Route path="/body" element={<Body />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/coach" element={<Coach />} />
+        <Route path="/achievements" element={<Achievements />} />
+        <Route path="/recap" element={<WeeklyRecap />} />
         <Route path="/settings" element={<SettingsHome />} />
         <Route path="/settings/profile" element={<ProfileSettings />} />
         <Route path="/settings/routines" element={<Routines />} />
@@ -75,6 +88,8 @@ function Shell({ onboarded }: { onboarded: boolean }) {
       </Suspense>
       {!hideTabs && <TabBar />}
       <Toaster />
+      <CelebrationLayer />
+      {isOnboarded && <AchievementWatcher />}
     </>
   );
 }

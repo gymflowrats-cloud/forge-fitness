@@ -1,4 +1,7 @@
+import { CalendarRange, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AchievementsSummary } from '../achievements/Achievements';
 import { Chip, ChipRow, SegmentedControl } from '../../components/Controls';
 import { Page, PageTitle } from '../../components/Layout';
 import { useProfile, useUnits } from '../../hooks/useData';
@@ -16,6 +19,7 @@ export default function Stats() {
   const data = useStatsData(range);
   const units = useUnits();
   const profile = useProfile();
+  const nav = useNavigate();
   return (
     <Page>
       <PageTitle title="Statistics" sub="Your progress at a glance" />
@@ -33,6 +37,19 @@ export default function Stats() {
           {RANGES.map((r) => <Chip key={r} active={range === r} onClick={() => setRange(r)}>{r}</Chip>)}
         </ChipRow>
       </div>
+      {tab === 'gym' && (
+        <div className="space-y-3 mb-4">
+          <AchievementsSummary onClick={() => nav('/achievements')} />
+          <button onClick={() => nav('/recap')} className="card p-4 w-full text-left flex items-center gap-3 active:scale-[0.99] transition-transform">
+            <div className="h-12 w-12 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0"><CalendarRange size={24} /></div>
+            <div className="flex-1 min-w-0">
+              <div className="font-extrabold">Weekly recap</div>
+              <div className="text-[13px] text-muted">Workouts, PRs, weight and food for each week</div>
+            </div>
+            <ChevronRight size={20} className="text-muted" />
+          </button>
+        </div>
+      )}
       {!data ? (
         <div className="card p-8 text-center text-muted">Crunching numbers…</div>
       ) : tab === 'gym' ? (

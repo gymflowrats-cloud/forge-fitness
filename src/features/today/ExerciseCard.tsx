@@ -1,6 +1,7 @@
 import { Check, ChevronDown, ChevronUp, MoreHorizontal, NotebookPen, Plus, SkipForward, Trash2, Trophy, Undo2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Stepper } from '../../components/Controls';
+import { celebrate } from '../../components/Celebrate';
 import { toast } from '../../components/Feedback';
 import { BottomSheet, ConfirmSheet } from '../../components/Sheet';
 import { db } from '../../db/db';
@@ -84,7 +85,7 @@ export function ExerciseCard({
     const { isPR } = await toggleSetComplete(s.id, next);
     if (next) {
       if (isPR) {
-        toast(`🏆 New PR on ${exercise?.name}!`, 'success');
+        if (!(await celebrate('pr', exercise?.name ?? 'New PR'))) toast(`🏆 New PR on ${exercise?.name}!`, 'success');
         vibrate([30, 60, 30]);
       }
       startRest(se.restSec ?? 90, exercise?.name);

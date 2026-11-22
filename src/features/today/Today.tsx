@@ -25,6 +25,8 @@ import { FinishSheet } from './FinishSheet';
 import { FocusLogger } from './FocusLogger';
 import { RestTimerBar } from './RestTimerBar';
 import { WearableCard } from '../../components/WearableCard';
+import { FatigueCard } from './FatigueCard';
+import { WeeklyRecapBanner } from './WeeklyRecapBanner';
 
 export default function Today() {
   const nav = useNavigate();
@@ -150,6 +152,8 @@ export default function Today() {
       {compact ? null : (
       <>
       <div className="space-y-3">
+        {isToday && <FatigueCard />}
+        {isToday && <WeeklyRecapBanner />}
         {reminders.recapReady && isToday && (
           <Banner title="Your weekly AI recap is ready" sub="Tap to see how last week went" onClick={() => nav('/coach?recap=1')} onDismiss={() => dismiss(reminders.recapKey)} />
         )}
@@ -207,9 +211,9 @@ export default function Today() {
       {session && (
         <>
           {compact ? (
-            <div className="rounded-[22px] px-5 py-3.5 text-white bg-gradient-to-br from-hero-from to-hero-to shadow-float">
+            <div className="rounded-[22px] px-5 py-3.5 text-white hero-surface shadow-float">
               <div className="flex items-center gap-4">
-                <div className="text-[28px] font-extrabold tabular leading-none">{fmtDuration(elapsed)}</div>
+                <div className="num text-[30px] font-extrabold tabular leading-none">{fmtDuration(elapsed)}</div>
                 <div className="flex-1 grid grid-cols-2 gap-2 text-[13px]">
                   <div><div className="text-white/65">Volume</div><div className="font-bold tabular">{volDisp} {units === 'metric' ? 'kg' : 'lb'}</div></div>
                   <div><div className="text-white/65">Sets</div><div className="font-bold tabular">{doneSets.length}/{plannedSets.length}{prs > 0 && <span className="ml-1.5">🏆{prs}</span>}</div></div>
@@ -223,7 +227,7 @@ export default function Today() {
               <span className="text-[16px] text-white/75">{session.status === 'done' ? 'Completed' : session.startedAt ? 'Session time' : 'Not started'}</span>
               {prs > 0 ? <HeroPill tone="success"><Trophy size={14} /> {prs} PR{prs > 1 ? 's' : ''}</HeroPill> : session.status === 'done' && <HeroPill tone="success">✓ Done</HeroPill>}
             </div>
-            <div className="text-[52px] font-extrabold tracking-tight tabular leading-tight">{fmtDuration(elapsed)}</div>
+            <div className="num text-[56px] font-extrabold tracking-tight tabular leading-tight">{fmtDuration(elapsed)}</div>
             <HeroSplit
               items={[
                 { label: `Volume (${units === 'metric' ? 'kg' : 'lb'})`, value: volDisp },

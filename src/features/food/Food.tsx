@@ -57,12 +57,12 @@ export default function Food() {
         <div className="flex items-center gap-5">
           <Ring value={t.calories} max={goal}>
             <div className="text-[11px] text-white/70">{over ? 'over' : 'left'}</div>
-            <div className="text-[24px] font-extrabold tabular leading-none">{fmtInt(Math.abs(remaining))}</div>
+            <div className="num text-[28px] font-extrabold tabular leading-none">{fmtInt(Math.abs(remaining))}</div>
             <div className="text-[11px] text-white/70">kcal</div>
           </Ring>
           <div className="min-w-0">
             <div className="text-white/75 text-[15px]">Eaten</div>
-            <div className="text-[40px] font-extrabold tracking-tight tabular leading-tight">{fmtInt(t.calories)}</div>
+            <div className="num text-[46px] font-extrabold tracking-tight tabular leading-tight">{fmtInt(t.calories)}</div>
             <div className="text-white/75 text-[15px]">of {fmtInt(goal)} kcal goal</div>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function Food() {
             </div>
             <div className="flex gap-2">
               <button aria-label="Remove 8 oz water" className="btn-ghost bg-track" onClick={() => addWater(date, -8)} disabled={!waterOz}><Minus size={20} /></button>
-              <button aria-label="Add 8 oz water" className="btn-ghost bg-primary text-white" onClick={() => addWater(date, 8)}><Plus size={20} /></button>
+              <button aria-label="Add 8 oz water" className="btn-ghost bg-accent text-accent-ink" onClick={() => addWater(date, 8)}><Plus size={20} /></button>
             </div>
           </div>
           <div className="flex gap-1.5 mt-4 flex-wrap">

@@ -76,7 +76,7 @@ export default function HealthSettings() {
     <Page>
       <BackHeader title="Fitbit (Google Health)" />
       <div className="space-y-4">
-        <div className="rounded-card p-5 text-white bg-gradient-to-br from-hero-from to-hero-to">
+        <div className="rounded-card p-5 text-white hero-surface">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-[16px] bg-white text-primary flex items-center justify-center"><HeartPulse size={26} /></div>
             <div>

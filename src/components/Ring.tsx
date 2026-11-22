@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /** Circular progress ring (white on the hero card by default). */
-export function Ring({ value, max, size = 112, stroke = 11, children, color = '#FFFFFF', track = 'rgba(255,255,255,0.18)', over = '#E8B1A6' }: {
+export function Ring({ value, max, size = 112, stroke = 11, children, color = 'rgb(var(--c-accent))', track = 'rgba(255,255,255,0.18)', over = '#E8B1A6' }: {
   value: number; max: number; size?: number; stroke?: number; children?: ReactNode; color?: string; track?: string; over?: string;
 }) {
   const r = (size - stroke) / 2;

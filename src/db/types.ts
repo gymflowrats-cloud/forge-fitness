@@ -47,6 +47,8 @@ export interface TemplateExercise {
   targetRepsMax: number;
   targetWeight: number | null; // lb
   restSec: number;
+  /** Exercises sharing a group id are done as a superset (alternating sets). */
+  group?: string | null;
 }
 
 export interface Template {
@@ -86,6 +88,7 @@ export interface SessionExercise {
   restSec?: number;
   targetRepsMin?: number;
   targetRepsMax?: number;
+  group?: string | null;
 }
 
 export interface WorkoutSet {

@@ -50,7 +50,7 @@ export function Fab({ onClick, label, icon }: { onClick: () => void; label: stri
     <button
       aria-label={label}
       onClick={onClick}
-      className="fixed right-5 z-40 h-16 w-16 rounded-full bg-primary text-white shadow-float flex items-center justify-center active:scale-90 transition-transform"
+      className="fixed right-5 z-40 h-16 w-16 rounded-full bg-accent text-accent-ink shadow-float flex items-center justify-center active:scale-90 transition-transform"
       style={{ bottom: 'calc(max(env(safe-area-inset-bottom), 10px) + 84px)' }}
     >
       {icon ?? <Plus size={30} strokeWidth={2.4} />}

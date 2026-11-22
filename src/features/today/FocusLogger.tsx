@@ -1,10 +1,13 @@
-import { Check, ChevronRight, Minus, NotebookPen, Plus, SkipForward, Trophy, Undo2 } from 'lucide-react';
+import { Check, ChevronRight, Disc3, Flame, Link2, Minus, NotebookPen, Plus, SkipForward, TrendingUp, Trophy, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '../../components/Feedback';
+import { celebrate } from '../../components/Celebrate';
 import { db } from '../../db/db';
 import { MUSCLE_LABELS } from '../../db/seedExercises';
 import type { Exercise, ExerciseType, SessionExercise, SetType, WorkoutSet } from '../../db/types';
-import { addSet, toggleSetComplete, updateSet } from '../../db/workouts';
+import { addSet, addWarmupSets, applyToOpenWorkingSets, toggleSetComplete, toggleSupersetWithNext, updateSet } from '../../db/workouts';
+import { BARS_KG, BARS_LB, suggestNext, warmupRamp } from '../../lib/progression';
+import { PlateSheet } from './PlateSheet';
 import { fmtNum } from '../../lib/format';
 import { dUnit, fromDispD, fromDispW, toDispD, toDispW, wUnit, type Units } from '../../lib/units';
 import { describeSet, describeSets } from './describe';
@@ -22,11 +25,11 @@ function BigStepper({ label, unit, value, step, decimals = 1, onChange }: { labe
     vibrate(8);
     onChange(Math.max(0, round((value ?? 0) + d)));
   };
-  const btn = 'h-[60px] w-12 shrink-0 rounded-[18px] bg-track flex items-center justify-center active:scale-90 transition-transform';
+  const btn = 'h-[60px] w-11 shrink-0 rounded-[18px] bg-track flex items-center justify-center active:scale-90 transition-transform';
   return (
     <div className="min-w-0">
       <div className="text-[11px] font-bold text-muted uppercase tracking-wide text-center mb-1">{unit}</div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         <button aria-label={`Decrease ${label}`} onClick={() => bump(-step)} className={btn}>
           <Minus size={24} strokeWidth={2.6} />
         </button>
@@ -53,7 +56,7 @@ function BigStepper({ label, unit, value, step, decimals = 1, onChange }: { labe
                 setText(value == null ? '' : String(value));
                 setEditing(true);
               }}
-              className={`w-full h-[60px] rounded-[16px] active:bg-track leading-none font-extrabold tabular truncate ${fmtNum(value ?? 0, decimals).length > 3 ? 'text-[26px]' : 'text-[34px]'}`}
+              className={`num w-full h-[60px] rounded-[16px] active:bg-track leading-none font-extrabold tabular truncate ${(n => (n > 3 ? 'text-[24px]' : n === 3 ? 'text-[31px]' : 'text-[38px]'))(fmtNum(value ?? 0, decimals).length)}`}
             >
               {value == null ? '–' : fmtNum(value, decimals)}
             </button>
@@ -109,6 +112,7 @@ export function FocusLogger({
   const [selSetId, setSelSetId] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [pop, setPop] = useState(false);
+  const [plates, setPlates] = useState(false);
   const startRest = useRestTimer((s) => s.start);
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +128,24 @@ export function FocusLogger({
   const workingIdx = sel ? exSets.slice(0, selIdx + 1).filter((x) => x.setType !== 'warmup').length - 1 : -1;
   const prevForSel = sel && sel.setType !== 'warmup' ? lastWorking[workingIdx] : undefined;
   const [note, setNote] = useState(current?.note ?? '');
+  const liftType = type === 'weight_reps' || type === 'bodyweight_reps';
+  const stepLb = fromDispW(step, units);
+  const openWorking = exSets.filter((x) => !x.completed && x.setType !== 'warmup');
+  const sugg = liftType && current && openWorking.length
+    ? suggestNext(last, { repsMin: current.targetRepsMin, repsMax: current.targetRepsMax, stepLb, bodyweight: type === 'bodyweight_reps' })
+    : null;
+  const allWorking = exSets.filter((x) => x.setType !== 'warmup');
+  const targetFor = (x: WorkoutSet) => sugg!.sets[Math.min(allWorking.indexOf(x), sugg!.sets.length - 1)]!;
+  const suggApplied = !!sugg && openWorking.every((x) => Math.abs((x.weight ?? 0) - (targetFor(x).weight ?? 0)) < 0.01 && x.reps === targetFor(x).reps);
+  const sugHead = sugg ? targetFor(openWorking[0]!) : null;
+  const sugRest = sugg && openWorking.length > 1 && openWorking.slice(1).some((x) => { const t = targetFor(x); return t.weight !== sugHead!.weight || t.reps !== sugHead!.reps; })
+    ? openWorking.slice(1).map((x) => describeSet({ ...x, ...targetFor(x) }, type, units)).join(', ')
+    : null;
+  const barbell = ex?.equipment === 'barbell';
+  const firstWork = exSets.find((x) => x.setType !== 'warmup');
+  const canWarm = type === 'weight_reps' && !exSets.some((x) => x.setType === 'warmup' || x.completed) && (firstWork?.weight ?? 0) > 0;
+  const group = current?.group ?? null;
+  const groupMembers = group ? active.filter((x) => x.group === group) : [];
 
   useEffect(() => {
     setNote(current?.note ?? '');
@@ -143,11 +165,23 @@ export function FocusLogger({
     vibrate(15);
     const { isPR } = await toggleSetComplete(sel.id, true);
     if (isPR) {
-      toast(`🏆 New PR on ${ex?.name}!`, 'success');
       vibrate([30, 60, 30]);
+      if (!(await celebrate('pr', ex?.name ?? 'New PR', describeSet({ ...sel, completed: true }, type, units)))) toast(`🏆 New PR on ${ex?.name}!`, 'success');
     }
     setSelSetId(null);
     const remaining = exSets.filter((x) => !x.completed && x.id !== sel.id);
+    // Superset: hop to the next partner with open sets; rest only after the last partner of the round.
+    if (groupMembers.length > 1) {
+      const gi = groupMembers.findIndex((x) => x.id === current.id);
+      const order = [...groupMembers.slice(gi + 1), ...groupMembers.slice(0, gi + 1)];
+      const nextInGroup = order.find((x) => (x.id === current.id ? remaining.length > 0 : hasOpen(x.id)));
+      if (nextInGroup) {
+        const wrapped = groupMembers.indexOf(nextInGroup) <= gi;
+        if (wrapped) startRest(current.restSec ?? 90, `next: ${exMap.get(nextInGroup.exerciseId)?.name}`);
+        if (nextInGroup.id !== current.id) setTimeout(() => setViewId(nextInGroup.id), 350);
+        return;
+      }
+    }
     if (remaining.length) startRest(current.restSec ?? 90, ex?.name);
     else {
       const idx = active.findIndex((x) => x.id === current.id);
@@ -181,6 +215,7 @@ export function FocusLogger({
               }`}
             >
               {complete && <Check size={15} strokeWidth={3} />}
+              {s.group && <Link2 size={14} className={on ? 'text-white/80' : 'text-accent'} aria-label="Superset" />}
               <span className="max-w-[130px] truncate">{exMap.get(s.exerciseId)?.name}</span>
               <span className={`tabular text-[12px] ${on ? 'text-white/75' : 'text-muted'}`}>{done}/{list.length}</span>
             </button>
@@ -207,10 +242,25 @@ export function FocusLogger({
               <div className="flex items-center gap-2 mt-1 flex-wrap text-[13px]">
                 {ex && <span className="font-semibold rounded-full bg-soft text-primary px-2.5 py-0.5">{MUSCLE_LABELS[ex.primaryMuscle]}</span>}
                 {current.isExtra && <span className="font-bold uppercase text-[11px] rounded-full bg-warn/15 text-warn px-2 py-0.5">Extra</span>}
+                {groupMembers.length > 1 && (
+                  <span className="font-bold text-[11px] rounded-full bg-accent/15 text-ink px-2 py-0.5 inline-flex items-center gap-1 text-left">
+                    <Link2 size={12} /> Superset with {groupMembers.filter((x) => x.id !== current.id).map((x) => exMap.get(x.exerciseId)?.name).join(', ')}
+                  </span>
+                )}
                 {current.targetRepsMin ? <span className="text-muted">Target {current.targetRepsMin === current.targetRepsMax || !current.targetRepsMax ? current.targetRepsMin : `${current.targetRepsMin}–${current.targetRepsMax}`} reps</span> : null}
               </div>
               <div className="text-[13px] text-muted mt-1 truncate">{last.length ? `Last time: ${describeSets(last, type, units)}` : 'First time — no history yet'}</div>
             </div>
+            <button
+              aria-label={group ? 'Unlink superset' : 'Superset with next exercise'}
+              className={`btn-ghost ${group ? 'text-accent' : 'text-muted'}`}
+              onClick={async () => {
+                const r = await toggleSupersetWithNext(current.id);
+                if (r) toast(r, 'success');
+              }}
+            >
+              <Link2 size={20} />
+            </button>
             <button aria-label="Exercise note" className={`btn-ghost -mr-2 ${noteOpen ? 'text-primary' : 'text-muted'}`} onClick={() => setNoteOpen(!noteOpen)}>
               <NotebookPen size={20} />
             </button>
@@ -224,6 +274,42 @@ export function FocusLogger({
               onBlur={() => note !== current.note && db.sessionExercises.update(current.id, { note })}
             />
           )}
+
+          {(sugg && !suggApplied) || canWarm ? (
+            <div className="mt-3 space-y-2">
+              {sugg && sugHead && !suggApplied && (
+                <div className="rounded-2xl bg-accent/[0.14] px-3 py-2.5 flex items-center gap-3">
+                  <TrendingUp size={20} className="text-accent shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-extrabold text-[15px] tabular">
+                      Try {sugHead.weight ? `${fmtNum(toDispW(sugHead.weight, units), 2)} ${wUnit(units)} × ` : ''}{sugHead.reps}
+                      {!sugHead.weight ? ' reps' : ''}
+                      {sugRest && <span className="font-semibold text-muted text-[13px]">, then {sugRest}</span>}
+                    </div>
+                    <div className="text-[12px] text-muted leading-snug">{sugg.reason}</div>
+                  </div>
+                  <button className="shrink-0 min-h-[40px] rounded-full bg-accent text-accent-ink font-bold px-4 text-[14px]" onClick={() => applyToOpenWorkingSets(current.id, sugg.sets)}>
+                    Apply
+                  </button>
+                </div>
+              )}
+              {canWarm && (
+                <button
+                  className="w-full min-h-[44px] rounded-2xl border border-dashed border-line text-[14px] font-semibold flex items-center justify-center gap-2 text-muted"
+                  onClick={async () => {
+                    const work = toDispW(firstWork!.weight, units) ?? 0;
+                    const ramp = warmupRamp(work, { barbell, bar: units === 'metric' ? BARS_KG[0]! : BARS_LB[0]!, inc: units === 'metric' ? 2.5 : 5 });
+                    if (!ramp.length) return toast('Working weight is light enough to skip warm-ups');
+                    await addWarmupSets(current.id, ramp.map((r) => ({ weight: fromDispW(r.weight, units), reps: r.reps })));
+                    setSelSetId(null);
+                    toast(`Added ${ramp.length} warm-up set${ramp.length > 1 ? 's' : ''}`, 'success');
+                  }}
+                >
+                  <Flame size={17} /> Add warm-up sets
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {/* Set chips */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3 -mx-1 px-1 pt-1.5 pb-1">
@@ -253,12 +339,18 @@ export function FocusLogger({
           {/* Current set */}
           <div className="mt-2 flex items-center justify-between">
             <button
-              className="text-[13px] font-bold text-muted min-h-[44px] flex items-center gap-1"
+              className="text-[12px] font-bold text-muted min-h-[44px] flex items-center gap-1 whitespace-nowrap min-w-0"
               onClick={() => updateSet(sel.id, { setType: SET_TYPES[(SET_TYPES.indexOf(sel.setType) + 1) % SET_TYPES.length]! })}
               aria-label="Change set type"
             >
-              SET {selIdx + 1} OF {exSets.length} · <span className={sel.setType === 'working' ? 'text-primary' : 'text-warn'}>{TYPE_LABEL[sel.setType]}</span>
+              SET {selIdx + 1} OF {exSets.length} · <span className={sel.setType === 'working' ? 'text-primary' : 'text-warn'}>{sel.setType === 'working' ? 'Working' : TYPE_LABEL[sel.setType]}</span>
             </button>
+            <div className="flex items-center gap-1.5">
+            {barbell && (
+              <button aria-label="Plate calculator" className="text-primary bg-soft rounded-full h-9 w-9 flex items-center justify-center" onClick={() => setPlates(true)}>
+                <Disc3 size={18} />
+              </button>
+            )}
             {prevForSel && (
               <button
                 className="text-[13px] font-semibold text-primary bg-soft rounded-full px-3 min-h-[36px]"
@@ -267,6 +359,7 @@ export function FocusLogger({
                 Last: {describeSet(prevForSel, type, units)}
               </button>
             )}
+            </div>
           </div>
           <div className="mt-2">
             <SetEditor s={sel} type={type} units={units} step={step} />
@@ -274,8 +367,8 @@ export function FocusLogger({
 
           <button
             onClick={logSet}
-            className={`mt-4 w-full h-16 rounded-[20px] text-white text-[20px] font-extrabold flex items-center justify-center gap-2 shadow-float transition-transform active:scale-[0.97] ${
-              sel.completed ? 'bg-success' : 'bg-primary'
+            className={`mt-4 w-full h-16 rounded-[20px] text-[20px] font-extrabold flex items-center justify-center gap-2 shadow-float transition-transform active:scale-[0.97] ${
+              sel.completed ? 'bg-success text-white' : 'bg-accent text-accent-ink'
             } ${pop ? 'animate-pop' : ''}`}
           >
             <Check size={26} strokeWidth={3} /> {sel.completed ? 'Saved · next' : `Log set ${selIdx + 1}`}
@@ -311,6 +404,13 @@ export function FocusLogger({
           </div>
         </div>
       ) : null}
+      <PlateSheet
+        open={plates}
+        onClose={() => setPlates(false)}
+        units={units}
+        initial={sel ? toDispW(sel.weight, units) : null}
+        onUse={(v) => sel && updateSet(sel.id, { weight: fromDispW(v, units) })}
+      />
       {!allDone && (
         <button className="w-full min-h-[48px] rounded-btn border border-line bg-card font-bold flex items-center justify-center gap-2" onClick={onFinish}>
           Finish workout

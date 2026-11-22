@@ -7,7 +7,9 @@ export default {
     extend: {
       colors: {
         primary: { DEFAULT: 'rgb(var(--c-primary) / <alpha-value>)', fg: '#FFFFFF' },
-        hero: { from: '#3E5444', to: '#2C3B30' },
+        accent: { DEFAULT: 'rgb(var(--c-accent) / <alpha-value>)', ink: 'rgb(var(--c-accent-ink) / <alpha-value>)' },
+        gold: 'rgb(var(--c-gold) / <alpha-value>)',
+        hero: { from: 'rgb(var(--c-hero-from) / <alpha-value>)', to: 'rgb(var(--c-hero-to) / <alpha-value>)' },
         bg: 'rgb(var(--c-bg) / <alpha-value>)',
         card: 'rgb(var(--c-card) / <alpha-value>)',
         line: 'rgb(var(--c-line) / <alpha-value>)',
@@ -21,6 +23,7 @@ export default {
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        num: ['"Barlow Condensed"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       borderRadius: { card: '24px', btn: '16px' },
       boxShadow: {

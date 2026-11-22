@@ -92,7 +92,7 @@ export default function Coach() {
     return (
       <Page>
         <PageTitle title="Coach" sub="Your AI training partner" />
-        <div className="rounded-card p-6 text-white bg-gradient-to-br from-hero-from to-hero-to">
+        <div className="rounded-card p-6 text-white hero-surface">
           <div className="h-14 w-14 rounded-[18px] bg-white text-primary flex items-center justify-center"><Sparkles size={28} /></div>
           <div className="text-[24px] font-extrabold mt-4">Set up your AI coach</div>
           <p className="text-white/80 mt-2">Forge uses Google Gemini. Get a free API key from Google AI Studio (aistudio.google.com/apikey) and paste it in Settings. It's stored only on this phone.</p>
@@ -195,7 +195,7 @@ export default function Coach() {
             placeholder="Ask your coach…"
             className="flex-1 resize-none bg-transparent outline-none py-2.5 max-h-28 text-[16px]"
           />
-          <button aria-label="Send" disabled={!text.trim() || !!busy} className="h-11 w-11 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 shrink-0">
+          <button aria-label="Send" disabled={!text.trim() || !!busy} className="h-11 w-11 rounded-full bg-accent text-accent-ink flex items-center justify-center disabled:opacity-40 shrink-0">
             {busy === 'chat' ? <Loader2 size={20} className="animate-spin" /> : <ArrowUp size={22} />}
           </button>
         </div>

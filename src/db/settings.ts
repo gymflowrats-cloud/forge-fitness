@@ -26,6 +26,12 @@ export interface AppSettings {
   googleClientId: string;
   lastHealthSync: string | null;
   healthErrors: Record<string, string>;
+  palette: 'forest' | 'amber' | 'terracotta' | 'ocean' | 'plum';
+  sportyNumbers: boolean;
+  heroTexture: boolean;
+  celebrations: boolean;
+  /** Achievement ids already celebrated, so each one pops only once. */
+  seenAchievements: string[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -48,6 +54,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   googleClientId: '',
   lastHealthSync: null,
   healthErrors: {},
+  palette: 'amber',
+  sportyNumbers: true,
+  heroTexture: true,
+  celebrations: true,
+  seenAchievements: [],
 };
 
 /** Keys never included in JSON backups. */
