@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Camera, Loader2, Pencil, Sparkles, Star, Trash2, Wand2 } from 'lucide-react';
+import { Camera, Loader2, Minus, Pencil, Plus, Sparkles, Star, Trash2, Wand2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Chip, ChipRow, Field, NumberInput, SegmentedControl, Stepper, Toggle } from '../../components/Controls';
@@ -7,7 +7,8 @@ import { SearchBox } from '../../components/ExercisePicker';
 import { toast } from '../../components/Feedback';
 import { FullSheet } from '../../components/Sheet';
 import { db } from '../../db/db';
-import { logCombo, logFood } from '../../db/food';
+import { frequentForMeal, logCombo, logFood, setLogServings } from '../../db/food';
+import { fmtNum } from '../../lib/format';
 import type { Food, MealCombo } from '../../db/types';
 import { useOnline } from '../../hooks/useOnline';
 import { useSettings } from '../../hooks/useData';
@@ -43,6 +44,141 @@ export function AddFoodSheet({ open, onClose, date, meal, setMeal }: { open: boo
 }
 
 function QuickAdd({ date, meal, onDone }: { date: string; meal: string; onDone: () => void }) {
+  const [mode, setMode] = useState<'total' | 'items'>(() => (sessionStorage.getItem('forge.quickMode') as 'total' | 'items') || 'items');
+  return (
+    <div className="space-y-4">
+      <SegmentedControl
+        size="sm"
+        options={[{ value: 'items', label: 'Item by item' }, { value: 'total', label: 'Just a total' }]}
+        value={mode}
+        onChange={(m) => {
+          setMode(m);
+          try { sessionStorage.setItem('forge.quickMode', m); } catch { /* ignore */ }
+        }}
+      />
+      {mode === 'items' ? <ItemsAdd date={date} meal={meal} onDone={onDone} /> : <TotalAdd date={date} meal={meal} onDone={onDone} />}
+    </div>
+  );
+}
+
+interface Row {
+  key: number;
+  name: string;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  servings: number;
+  servingDesc: string;
+  foodId: string | null;
+  macros: boolean;
+}
+let rowKey = 0;
+const emptyRow = (): Row => ({ key: ++rowKey, name: '', calories: null, protein: null, carbs: null, fat: null, servings: 1, servingDesc: '1 serving', foodId: null, macros: false });
+
+/** Log several foods at once, each with its own calories (and optional macros). Typing a name suggests foods you've logged before. */
+function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: () => void }) {
+  const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
+  const [focusKey, setFocusKey] = useState<number | null>(null);
+  const [fav, setFav] = useState(false);
+  const foods = useLiveQuery(() => db.foods.toArray(), [], [] as Food[]) ?? [];
+  const set = (key: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const valid = rows.filter((r) => r.calories != null && (r.calories > 0 || r.name.trim()));
+  const total = valid.reduce((a, r) => a + (r.calories ?? 0) * r.servings, 0);
+  const suggestFor = (r: Row) => {
+    const q = r.name.trim().toLowerCase();
+    if (q.length < 2 || r.foodId) return [];
+    return foods.filter((f) => f.name.toLowerCase().includes(q)).sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? '')).slice(0, 3);
+  };
+  const save = async () => {
+    if (!valid.length) return toast('Enter calories for at least one item', 'error');
+    for (const [i, r] of valid.entries()) {
+      await logFood(date, meal, {
+        name: r.name.trim() || `Item ${i + 1}`, calories: r.calories ?? 0, protein: r.protein ?? 0, carbs: r.carbs ?? 0, fat: r.fat ?? 0,
+        servings: r.servings, servingDesc: r.servingDesc, foodId: r.foodId,
+      }, 'manual', fav);
+    }
+    toast(`Logged ${valid.length} item${valid.length > 1 ? 's' : ''} · ${Math.round(total)} kcal`, 'success');
+    onDone();
+  };
+  return (
+    <div className="space-y-3">
+      {rows.map((r, i) => {
+        const sug = focusKey === r.key ? suggestFor(r) : [];
+        return (
+          <div key={r.key} className="card p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="h-7 w-7 shrink-0 rounded-full bg-track text-muted text-[13px] font-bold flex items-center justify-center">{i + 1}</span>
+              <input
+                className="flex-1 min-w-0 bg-transparent font-bold text-[16px] outline-none placeholder:text-muted/60 placeholder:font-semibold"
+                placeholder="Food, e.g. 2 rotis"
+                aria-label={`Item ${i + 1} name`}
+                value={r.name}
+                onFocus={() => setFocusKey(r.key)}
+                onBlur={() => setTimeout(() => setFocusKey((k) => (k === r.key ? null : k)), 150)}
+                onChange={(e) => set(r.key, { name: e.target.value, foodId: null })}
+              />
+              {rows.length > 1 && (
+                <button aria-label={`Remove item ${i + 1}`} className="btn-ghost text-muted -mr-1 !min-h-[36px] !min-w-[36px]" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={18} /></button>
+              )}
+            </div>
+            {sug.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {sug.map((f) => (
+                  <button
+                    key={f.id}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => set(r.key, { name: f.name, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat, servingDesc: f.servingDesc, foodId: f.id })}
+                    className="rounded-full bg-accent/15 px-3 min-h-[34px] text-[13px] font-semibold"
+                  >
+                    {f.name} · {f.calories}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <NumberInput
+                ariaLabel={`Item ${i + 1} calories`}
+                value={r.calories}
+                onChange={(v) => set(r.key, { calories: v })}
+                placeholder="kcal"
+                decimal={false}
+                className="w-24 h-12 rounded-xl bg-track/70 text-center text-[20px] font-extrabold tabular outline-none focus:ring-2 focus:ring-accent placeholder:text-[15px] placeholder:font-semibold placeholder:text-muted/60"
+              />
+              <span className="text-muted text-[13px]">×</span>
+              <Stepper value={r.servings} onChange={(v) => set(r.key, { servings: v ?? 1 })} step={0.5} min={0.5} decimals={1} label={`item ${i + 1} servings`} compact />
+              <button className={`ml-auto whitespace-nowrap text-[13px] font-bold min-h-[40px] px-1 ${r.macros ? 'text-ink' : 'text-muted'}`} onClick={() => set(r.key, { macros: !r.macros })}>
+                {r.macros ? 'Hide' : '+ Macros'}
+              </button>
+            </div>
+            {r.macros && (
+              <div className="grid grid-cols-3 gap-2">
+                {(['protein', 'carbs', 'fat'] as const).map((k) => (
+                  <label key={k} className="block">
+                    <span className="text-[11px] font-bold uppercase text-muted">{k[0]!.toUpperCase()} g</span>
+                    <NumberInput value={r[k]} onChange={(v) => set(r.key, { [k]: v })} placeholder="0" className="w-full h-11 rounded-xl bg-track/70 text-center font-bold tabular outline-none focus:ring-2 focus:ring-accent" />
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <button className="w-full min-h-[48px] rounded-btn border border-dashed border-line font-semibold flex items-center justify-center gap-2 text-muted" onClick={() => setRows([...rows, emptyRow()])}>
+        <Plus size={18} /> Add another item
+      </button>
+      <div className="card px-4 min-h-[56px] flex items-center justify-between">
+        <span className="font-semibold flex items-center gap-2"><Star size={18} className="text-warn" /> Save items to My foods</span>
+        <Toggle checked={fav} onChange={setFav} label="Save items to My foods" />
+      </div>
+      <button className="btn-primary" onClick={save} disabled={!valid.length}>
+        Save {valid.length || ''} item{valid.length === 1 ? '' : 's'} · <span className="num tabular">{Math.round(total)}</span> kcal
+      </button>
+    </div>
+  );
+}
+
+function TotalAdd({ date, meal, onDone }: { date: string; meal: string; onDone: () => void }) {
   const [name, setName] = useState('');
   const [cal, setCal] = useState<number | null>(null);
   const [p, setP] = useState<number | null>(null);
@@ -94,77 +230,122 @@ function QuickAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
   );
 }
 
+type SavedView = 'usual' | 'recent' | 'starred' | 'combos';
+
+/** One food with a one-tap + and a live serving counter for what you've added this time. */
+function FoodRow({ f, count, onAdd, onMinus, onStar }: { f: Food; count: number; onAdd: () => void; onMinus: () => void; onStar: () => void }) {
+  return (
+    <div className={`card pl-4 pr-2 py-2 flex items-center gap-2 ${count ? '!border-accent' : ''}`}>
+      <button className="flex-1 min-w-0 text-left py-1" onClick={onAdd}>
+        <div className="font-bold truncate">{f.name}</div>
+        <div className="text-[13px] text-muted truncate">
+          <span className="font-semibold text-ink tabular">{f.calories} kcal</span> · {f.servingDesc}{f.protein ? ` · P${f.protein}` : ''}
+        </div>
+      </button>
+      <button aria-label={f.isFavorite ? `Unstar ${f.name}` : `Star ${f.name}`} className="btn-ghost !min-w-[36px]" onClick={onStar}>
+        <Star size={18} className={f.isFavorite ? 'text-warn fill-warn' : 'text-muted/60'} />
+      </button>
+      {count > 0 ? (
+        <div className="flex items-center rounded-full bg-accent text-accent-ink">
+          <button aria-label={`One less ${f.name}`} className="h-11 w-10 flex items-center justify-center" onClick={onMinus}><Minus size={18} strokeWidth={2.6} /></button>
+          <span className="num tabular font-extrabold text-[18px] min-w-[1.5ch] text-center">{fmtNum(count, 1)}</span>
+          <button aria-label={`One more ${f.name}`} className="h-11 w-10 flex items-center justify-center" onClick={onAdd}><Plus size={18} strokeWidth={2.6} /></button>
+        </div>
+      ) : (
+        <button aria-label={`Add ${f.name}`} className="h-11 w-11 rounded-full bg-accent/15 text-ink flex items-center justify-center shrink-0" onClick={onAdd}>
+          <Plus size={20} strokeWidth={2.6} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SavedFoods({ date, meal }: { date: string; meal: string }) {
   const [q, setQ] = useState('');
-  const [servings, setServings] = useState<number | null>(1);
-  const recent = useLiveQuery(() => db.foods.orderBy('lastUsedAt').reverse().limit(12).toArray(), [], [] as Food[]) ?? [];
-  const mine = useLiveQuery(() => db.foods.filter((f) => f.isFavorite).toArray(), [], [] as Food[]) ?? [];
-  const all = useLiveQuery(() => (q ? db.foods.filter((f) => f.name.toLowerCase().includes(q.toLowerCase())).limit(30).toArray() : Promise.resolve([] as Food[])), [q], [] as Food[]) ?? [];
+  const usual = useLiveQuery(() => frequentForMeal(date, meal), [date, meal], [] as Food[]) ?? [];
+  const recent = useLiveQuery(() => db.foods.orderBy('lastUsedAt').reverse().limit(25).toArray(), [], [] as Food[]) ?? [];
+  const starred = useLiveQuery(() => db.foods.filter((f) => f.isFavorite).toArray().then((l) => l.sort((a, b) => a.name.localeCompare(b.name))), [], [] as Food[]) ?? [];
+  const found = useLiveQuery(
+    () => (q.trim() ? db.foods.filter((f) => q.toLowerCase().trim().split(/\s+/).every((t) => f.name.toLowerCase().includes(t))).limit(40).toArray() : Promise.resolve([] as Food[])),
+    [q], [] as Food[],
+  ) ?? [];
   const combos = useLiveQuery(() => db.mealCombos.toArray(), [], [] as MealCombo[]) ?? [];
-  const log = async (f: Food) => {
-    const l = await logFood(date, meal, { ...f, foodId: f.id, servings: servings ?? 1 });
-    toast(`Added ${f.name} · ${l.calories} kcal`, 'success', { label: 'Undo', run: () => db.foodLogs.delete(l.id) });
+  const [view, setView] = useState<SavedView | null>(null);
+  const shown: SavedView = view ?? (usual.length ? 'usual' : recent.length ? 'recent' : 'starred');
+  // What was added during this visit: food id → log id + servings, so +/− edit the same log entry.
+  const [added, setAdded] = useState<Record<string, { logId: string; n: number }>>({});
+  const k = (f: Food) => `${meal}:${f.name.toLowerCase().trim()}`; // by name: a rebuilt-from-log food gets a real id on first add
+
+  const add = async (f: Food) => {
+    const cur = added[k(f)];
+    if (cur) {
+      await setLogServings(cur.logId, f, cur.n + 1);
+      setAdded({ ...added, [k(f)]: { ...cur, n: cur.n + 1 } });
+    } else {
+      const l = await logFood(date, meal, { ...f, foodId: f.id, servings: 1 });
+      setAdded({ ...added, [k(f)]: { logId: l.id, n: 1 } });
+      toast(`Added ${f.name} to ${meal}`, 'success');
+    }
   };
-  const list = q ? all : mine;
+  const minus = async (f: Food) => {
+    const cur = added[k(f)];
+    if (!cur) return;
+    await setLogServings(cur.logId, f, cur.n - 1);
+    const next = { ...added };
+    if (cur.n - 1 <= 0) delete next[k(f)];
+    else next[k(f)] = { ...cur, n: cur.n - 1 };
+    setAdded(next);
+  };
+  const row = (f: Food) => (
+    <FoodRow key={f.id} f={f} count={added[k(f)]?.n ?? 0} onAdd={() => add(f)} onMinus={() => minus(f)} onStar={() => db.foods.update(f.id, { isFavorite: !f.isFavorite })} />
+  );
+  const addedTotal = Object.entries(added).filter(([key]) => key.startsWith(`${meal}:`)).length;
+
+  const list = q.trim() ? found : shown === 'usual' ? usual : shown === 'recent' ? recent : shown === 'starred' ? starred : [];
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <span className="font-semibold">Servings</span>
-        <Stepper value={servings} onChange={setServings} step={0.5} min={0.25} decimals={2} label="servings" compact />
-      </div>
-      {recent.length > 0 && (
-        <div>
-          <div className="section-label mb-2">Recent · tap to log</div>
-          <ChipRow>
-            {recent.map((f) => (
-              <Chip key={f.id} onClick={() => log(f)}>
-                {f.name} <span className="text-muted text-[13px]">{f.calories}</span>
-              </Chip>
-            ))}
-          </ChipRow>
-        </div>
+    <div className="space-y-3">
+      <SearchBox value={q} onChange={setQ} placeholder="Search everything you've logged" />
+      {!q.trim() && (
+        <ChipRow>
+          {usual.length > 0 && <Chip active={shown === 'usual'} onClick={() => setView('usual')}>Usual {meal.toLowerCase()}</Chip>}
+          <Chip active={shown === 'recent'} onClick={() => setView('recent')}>Recent</Chip>
+          <Chip active={shown === 'starred'} onClick={() => setView('starred')}>Starred</Chip>
+          {combos.length > 0 && <Chip active={shown === 'combos'} onClick={() => setView('combos')}>Combos</Chip>}
+        </ChipRow>
       )}
-      {combos.length > 0 && (
-        <div>
-          <div className="section-label mb-2">Meal combos</div>
-          <div className="space-y-2">
-            {combos.map((c) => (
-              <div key={c.id} className="card px-4 py-3 flex items-center gap-3">
-                <button
-                  className="flex-1 text-left min-w-0"
-                  onClick={async () => {
-                    const n = await logCombo(c.id, date, meal);
-                    toast(`Logged ${c.name} (${n} items)`, 'success');
-                  }}
-                >
-                  <div className="font-bold truncate">{c.name}</div>
-                  <div className="text-[13px] text-muted truncate">{c.items.length} items · {c.items.reduce((a, i) => a + i.calories, 0)} kcal</div>
-                </button>
-                <button aria-label={`Delete combo ${c.name}`} className="btn-ghost text-muted" onClick={() => db.mealCombos.delete(c.id)}><Trash2 size={18} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="space-y-3">
-        <div className="section-label">{q ? 'Search results' : 'My foods'}</div>
-        <SearchBox value={q} onChange={setQ} placeholder="Search foods you've logged" />
-        {list.length === 0 && <div className="text-muted text-center py-6 text-[15px]">{q ? 'No matches' : 'Star foods when you add them to see them here.'}</div>}
+      {addedTotal > 0 && <div className="text-[13px] text-muted">Added {addedTotal} food{addedTotal > 1 ? 's' : ''} to {meal}. Use − to undo.</div>}
+      {!q.trim() && shown === 'combos' ? (
         <div className="space-y-2">
-          {list.map((f) => (
-            <div key={f.id} className="card px-4 py-3 flex items-center gap-3">
-              <button className="flex-1 min-w-0 text-left" onClick={() => log(f)}>
-                <div className="font-bold truncate">{f.name}</div>
-                <div className="text-[13px] text-muted truncate">{f.servingDesc} · P{f.protein} C{f.carbs} F{f.fat}</div>
-              </button>
-              <div className="font-extrabold tabular">{f.calories}</div>
-              <button aria-label={f.isFavorite ? 'Remove from My foods' : 'Add to My foods'} className="btn-ghost" onClick={() => db.foods.update(f.id, { isFavorite: !f.isFavorite })}>
-                <Star size={20} className={f.isFavorite ? 'text-warn fill-warn' : 'text-muted'} />
+          {combos.map((c) => (
+            <div key={c.id} className="card px-4 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold truncate">{c.name}</div>
+                <div className="text-[13px] text-muted truncate">{c.items.map((i) => i.name).join(', ')} · {c.items.reduce((a, i) => a + i.calories, 0)} kcal</div>
+              </div>
+              <button aria-label={`Delete combo ${c.name}`} className="btn-ghost text-muted" onClick={() => db.mealCombos.delete(c.id)}><Trash2 size={18} /></button>
+              <button
+                aria-label={`Add ${c.name}`}
+                className="h-11 w-11 rounded-full bg-accent text-accent-ink flex items-center justify-center shrink-0"
+                onClick={async () => {
+                  const n = await logCombo(c.id, date, meal);
+                  toast(`Logged ${c.name} (${n} items)`, 'success');
+                }}
+              >
+                <Plus size={20} strokeWidth={2.6} />
               </button>
             </div>
           ))}
         </div>
-      </div>
+      ) : (
+        <>
+          {list.length === 0 && (
+            <div className="text-muted text-center py-6 text-[15px]">
+              {q.trim() ? `No foods match "${q}". Add it in Quick.` : shown === 'starred' ? 'Tap the star on any food to keep it here.' : 'Foods you log will show up here.'}
+            </div>
+          )}
+          <div className="space-y-2">{list.map(row)}</div>
+        </>
+      )}
     </div>
   );
 }

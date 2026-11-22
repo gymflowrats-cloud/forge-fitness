@@ -11,7 +11,7 @@ import { db } from '../../db/db';
 import { addWater, copyMealFromYesterday, defaultMealForNow, saveCombo, sumLogs } from '../../db/food';
 import type { FoodLog } from '../../db/types';
 import { useProfile, useSettings } from '../../hooks/useData';
-import { todayKey } from '../../lib/dates';
+import { shiftKey, todayKey } from '../../lib/dates';
 import { fmtInt } from '../../lib/format';
 import { AddFoodSheet } from './AddFoodSheet';
 
@@ -27,6 +27,16 @@ export default function Food() {
   const [menuMeal, setMenuMeal] = useState<string | null>(null);
   const [comboName, setComboName] = useState('');
   const [editing, setEditing] = useState<FoodLog | null>(null);
+  const yLogs = useLiveQuery(() => db.foodLogs.where('date').equals(shiftKey(date, -1)).toArray(), [date], [] as FoodLog[]) ?? [];
+  // Yesterday's non-empty meals: the tapped meal first, then its lunch/dinner partner, so swaps are one tap.
+  const swapPair = (m: string | null) => ({ lunch: 'dinner', dinner: 'lunch' } as Record<string, string>)[(m ?? '').toLowerCase()];
+  const mealRank = (m: string) => (m === menuMeal ? -2 : m.toLowerCase() === swapPair(menuMeal) ? -1 : s.meals.indexOf(m));
+  const yesterdayMeals = [...new Set(yLogs.map((l) => l.meal))]
+    .sort((a, b) => mealRank(a) - mealRank(b))
+    .map((m) => {
+      const items = yLogs.filter((l) => l.meal === m);
+      return { meal: m, names: items.map((l) => l.name).join(', '), kcal: items.reduce((a, l) => a + l.calories, 0) };
+    });
 
   const t = sumLogs(logs);
   const goal = p?.calorieTarget ?? 2200;
@@ -165,16 +175,26 @@ export default function Food() {
 
       <BottomSheet open={!!menuMeal} onClose={() => { setMenuMeal(null); setComboName(''); }} title={menuMeal ?? ''}>
         <div className="space-y-3">
-          <button
-            className="w-full min-h-[52px] rounded-btn bg-card border border-line px-4 flex items-center gap-3 font-semibold"
-            onClick={async () => {
-              const n = await copyMealFromYesterday(date, menuMeal!);
-              toast(n ? `Copied ${n} item${n > 1 ? 's' : ''} from yesterday` : `Nothing logged for ${menuMeal} yesterday`, n ? 'success' : 'default');
-              setMenuMeal(null);
-            }}
-          >
-            <CopyPlus size={20} /> Copy yesterday's {menuMeal?.toLowerCase()}
-          </button>
+          <div className="section-label">Copy from yesterday into {menuMeal}</div>
+          {yesterdayMeals.length === 0 && <div className="text-muted text-[14px]">Nothing was logged yesterday.</div>}
+          {yesterdayMeals.map((ym) => (
+            <button
+              key={ym.meal}
+              className="w-full min-h-[56px] rounded-btn bg-card border border-line px-4 py-2 flex items-center gap-3 text-left"
+              onClick={async () => {
+                const n = await copyMealFromYesterday(date, ym.meal, menuMeal!);
+                toast(`Copied ${n} item${n > 1 ? 's' : ''} from yesterday's ${ym.meal.toLowerCase()}`, 'success');
+                setMenuMeal(null);
+              }}
+            >
+              <CopyPlus size={20} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold">Yesterday's {ym.meal.toLowerCase()}</div>
+                <div className="text-[13px] text-muted truncate">{ym.names}</div>
+              </div>
+              <span className="font-bold tabular text-[14px] shrink-0">{ym.kcal} kcal</span>
+            </button>
+          ))}
           <div className="card p-4 space-y-3">
             <div className="font-semibold flex items-center gap-2"><BookmarkPlus size={20} /> Save as reusable combo</div>
             <input className="input" placeholder={`e.g. My usual ${menuMeal?.toLowerCase()}`} value={comboName} onChange={(e) => setComboName(e.target.value)} />

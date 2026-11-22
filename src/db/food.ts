@@ -19,7 +19,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 /** Upsert into the foods table (by name) so it shows up in Recent; favorite=true puts it in "My foods". */
 export async function upsertFood(item: FoodItemInput, favorite = false): Promise<string> {
   const name = item.name.trim();
-  const existing = item.foodId ? await db.foods.get(item.foodId) : (await db.foods.toArray()).find((f) => f.name.toLowerCase() === name.toLowerCase());
+  const existing = (item.foodId ? await db.foods.get(item.foodId) : undefined) ?? (await db.foods.toArray()).find((f) => f.name.toLowerCase() === name.toLowerCase());
   const now = new Date().toISOString();
   if (existing) {
     await db.foods.update(existing.id, { lastUsedAt: now, isFavorite: existing.isFavorite || favorite });
@@ -45,10 +45,40 @@ export async function logFood(date: string, meal: string, item: FoodItemInput, s
   return log;
 }
 
-export async function copyMealFromYesterday(date: string, meal: string) {
-  const prev = await db.foodLogs.where('date').equals(shiftKey(date, -1)).filter((l) => l.meal === meal).toArray();
-  await db.foodLogs.bulkAdd(prev.map((l) => ({ ...l, id: uid(), date, createdAt: new Date().toISOString() })));
+/** Copy yesterday's `fromMeal` into today's `toMeal` (they can differ, e.g. lunch and dinner swapped). */
+export async function copyMealFromYesterday(date: string, fromMeal: string, toMeal: string = fromMeal) {
+  const prev = await db.foodLogs.where('date').equals(shiftKey(date, -1)).filter((l) => l.meal === fromMeal).toArray();
+  await db.foodLogs.bulkAdd(prev.map((l) => ({ ...l, id: uid(), date, meal: toMeal, createdAt: new Date().toISOString() })));
   return prev.length;
+}
+
+/** Change how many servings a logged food has; 0 deletes it. Totals are recomputed from the food's per-serving values. */
+export async function setLogServings(logId: string, food: Pick<Food, 'calories' | 'protein' | 'carbs' | 'fat'>, servings: number) {
+  if (servings <= 0) return db.foodLogs.delete(logId);
+  await db.foodLogs.update(logId, {
+    servings, calories: Math.round(food.calories * servings), protein: r1(food.protein * servings), carbs: r1(food.carbs * servings), fat: r1(food.fat * servings),
+  });
+}
+
+/** Foods most often logged in this meal over the last `days` days, most frequent first (matched by id or name). */
+export async function frequentForMeal(date: string, meal: string, days = 45, limit = 12): Promise<Food[]> {
+  const logs = await db.foodLogs.where('date').between(shiftKey(date, -days), date, true, true).filter((l) => l.meal === meal).toArray();
+  const foods = await db.foods.toArray();
+  const byId = new Map(foods.map((f) => [f.id, f]));
+  const byName = new Map(foods.map((f) => [f.name.toLowerCase().trim(), f]));
+  const count = new Map<string, number>();
+  for (const l of [...logs].sort((a, b) => b.date.localeCompare(a.date))) {
+    let f = (l.foodId && byId.get(l.foodId)) || byName.get(l.name.toLowerCase().trim());
+    if (!f) {
+      // Older/imported logs without a saved food: rebuild a per-serving entry from the log (saved on first re-add).
+      const n = l.servings || 1;
+      f = { id: `log:${l.name.toLowerCase().trim()}`, name: l.name, servingDesc: '1 serving', calories: Math.round(l.calories / n), protein: r1(l.protein / n), carbs: r1(l.carbs / n), fat: r1(l.fat / n), isFavorite: false, lastUsedAt: null };
+      byId.set(f.id, f);
+      byName.set(l.name.toLowerCase().trim(), f);
+    }
+    count.set(f.id, (count.get(f.id) ?? 0) + 1);
+  }
+  return [...count].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => byId.get(id)!);
 }
 
 export async function saveCombo(name: string, date: string, meal: string) {

@@ -66,29 +66,3 @@ export function platesPerSide(target: number, bar: number, plates: number[]): { 
   const achieved = bar + perSide.reduce((a, p) => a + p, 0) * 2;
   return { perSide, achieved: Math.round(achieved * 100) / 100, remainder: Math.round((target - achieved) * 100) / 100 };
 }
-
-// ---------- Warm-ups ----------
-const roundTo = (v: number, inc: number) => Math.round(v / inc) * inc;
-
-/**
- * Warm-up ramp for a working weight, in display units. Barbell lifts start with the empty bar;
- * other equipment uses two lighter sets. Returns [] when the working weight is too light to bother.
- */
-export function warmupRamp(work: number, opts: { barbell: boolean; bar: number; inc: number }): { weight: number; reps: number }[] {
-  if (!work || work <= 0) return [];
-  const out: { weight: number; reps: number }[] = [];
-  if (opts.barbell) {
-    if (work <= opts.bar * 1.25) return [];
-    out.push({ weight: opts.bar, reps: 10 });
-    for (const [pct, reps] of [[0.4, 5], [0.6, 3], [0.8, 2]] as const) {
-      const w = roundTo(work * pct, opts.inc);
-      if (w > out[out.length - 1]!.weight && w < work) out.push({ weight: w, reps });
-    }
-  } else {
-    for (const [pct, reps] of [[0.5, 8], [0.75, 4]] as const) {
-      const w = roundTo(work * pct, opts.inc);
-      if (w > 0 && w < work && (!out.length || w > out[out.length - 1]!.weight)) out.push({ weight: w, reps });
-    }
-  }
-  return out;
-}

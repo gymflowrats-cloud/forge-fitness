@@ -286,24 +286,6 @@ export const bestSetLabel = (sets: WorkoutSet[]) => {
   return best;
 };
 
-/** Insert warm-up sets (weights in lb) before the existing sets of a session exercise. */
-export async function addWarmupSets(seId: string, ramp: { weight: number; reps: number }[]) {
-  if (!ramp.length) return;
-  await db.transaction('rw', db.sets, db.sessionExercises, db.workoutSessions, async () => {
-    const se = await db.sessionExercises.get(seId);
-    if (!se) return;
-    const session = await db.workoutSessions.get(se.sessionId);
-    const existing = await db.sets.where('sessionExerciseId').equals(seId).sortBy('order');
-    for (const s of existing) await db.sets.update(s.id, { order: s.order + ramp.length });
-    await db.sets.bulkAdd(
-      ramp.map((r, i) => ({
-        id: uid(), sessionExerciseId: seId, sessionId: se.sessionId, exerciseId: se.exerciseId, order: i, setType: 'warmup' as SetType,
-        weight: r.weight, reps: r.reps, durationSec: null, distance: null, calories: null, completed: false, completedAt: null, isPR: false, date: session?.date,
-      })),
-    );
-  });
-}
-
 /** Apply per-set targets (lb) to the not-yet-done working sets of a session exercise, in order. */
 export async function applyToOpenWorkingSets(seId: string, targets: { weight: number | null; reps: number }[]) {
   if (!targets.length) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLATES_KG, PLATES_LB, platesPerSide, suggestNext, warmupRamp } from './progression';
+import { PLATES_KG, PLATES_LB, platesPerSide, suggestNext } from './progression';
 
 describe('suggestNext', () => {
   const w = (weight: number, reps: number) => ({ weight, reps, setType: 'working' });
@@ -39,19 +39,5 @@ describe('platesPerSide', () => {
   });
   it('empty bar when target is below the bar', () => {
     expect(platesPerSide(30, 45, PLATES_LB).perSide).toEqual([]);
-  });
-});
-
-describe('warmupRamp', () => {
-  it('ramps a barbell lift from the empty bar', () => {
-    const r = warmupRamp(225, { barbell: true, bar: 45, inc: 5 });
-    expect(r[0]).toEqual({ weight: 45, reps: 10 });
-    expect(r.map((x) => x.weight)).toEqual([45, 90, 135, 180]);
-  });
-  it('skips warm-ups for light weights', () => {
-    expect(warmupRamp(50, { barbell: true, bar: 45, inc: 5 })).toEqual([]);
-  });
-  it('uses two sets for dumbbells', () => {
-    expect(warmupRamp(30, { barbell: false, bar: 0, inc: 2.5 })).toEqual([{ weight: 15, reps: 8 }, { weight: 22.5, reps: 4 }]);
   });
 });

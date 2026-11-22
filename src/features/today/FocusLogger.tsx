@@ -1,12 +1,12 @@
-import { Check, ChevronRight, Disc3, Flame, Link2, Minus, NotebookPen, Plus, SkipForward, TrendingUp, Trophy, Undo2 } from 'lucide-react';
+import { Check, ChevronRight, Disc3, Link2, Minus, NotebookPen, Plus, SkipForward, TrendingUp, Trophy, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '../../components/Feedback';
 import { celebrate } from '../../components/Celebrate';
 import { db } from '../../db/db';
 import { MUSCLE_LABELS } from '../../db/seedExercises';
 import type { Exercise, ExerciseType, SessionExercise, SetType, WorkoutSet } from '../../db/types';
-import { addSet, addWarmupSets, applyToOpenWorkingSets, toggleSetComplete, toggleSupersetWithNext, updateSet } from '../../db/workouts';
-import { BARS_KG, BARS_LB, suggestNext, warmupRamp } from '../../lib/progression';
+import { addSet, applyToOpenWorkingSets, toggleSetComplete, toggleSupersetWithNext, updateSet } from '../../db/workouts';
+import { suggestNext } from '../../lib/progression';
 import { PlateSheet } from './PlateSheet';
 import { fmtNum } from '../../lib/format';
 import { dUnit, fromDispD, fromDispW, toDispD, toDispW, wUnit, type Units } from '../../lib/units';
@@ -142,8 +142,6 @@ export function FocusLogger({
     ? openWorking.slice(1).map((x) => describeSet({ ...x, ...targetFor(x) }, type, units)).join(', ')
     : null;
   const barbell = ex?.equipment === 'barbell';
-  const firstWork = exSets.find((x) => x.setType !== 'warmup');
-  const canWarm = type === 'weight_reps' && !exSets.some((x) => x.setType === 'warmup' || x.completed) && (firstWork?.weight ?? 0) > 0;
   const group = current?.group ?? null;
   const groupMembers = group ? active.filter((x) => x.group === group) : [];
 
@@ -275,7 +273,7 @@ export function FocusLogger({
             />
           )}
 
-          {(sugg && !suggApplied) || canWarm ? (
+          {sugg && !suggApplied ? (
             <div className="mt-3 space-y-2">
               {sugg && sugHead && !suggApplied && (
                 <div className="rounded-2xl bg-accent/[0.14] px-3 py-2.5 flex items-center gap-3">
@@ -292,21 +290,6 @@ export function FocusLogger({
                     Apply
                   </button>
                 </div>
-              )}
-              {canWarm && (
-                <button
-                  className="w-full min-h-[44px] rounded-2xl border border-dashed border-line text-[14px] font-semibold flex items-center justify-center gap-2 text-muted"
-                  onClick={async () => {
-                    const work = toDispW(firstWork!.weight, units) ?? 0;
-                    const ramp = warmupRamp(work, { barbell, bar: units === 'metric' ? BARS_KG[0]! : BARS_LB[0]!, inc: units === 'metric' ? 2.5 : 5 });
-                    if (!ramp.length) return toast('Working weight is light enough to skip warm-ups');
-                    await addWarmupSets(current.id, ramp.map((r) => ({ weight: fromDispW(r.weight, units), reps: r.reps })));
-                    setSelSetId(null);
-                    toast(`Added ${ramp.length} warm-up set${ramp.length > 1 ? 's' : ''}`, 'success');
-                  }}
-                >
-                  <Flame size={17} /> Add warm-up sets
-                </button>
               )}
             </div>
           ) : null}
