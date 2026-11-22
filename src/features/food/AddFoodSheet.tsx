@@ -84,9 +84,15 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
   const [aiBusy, setAiBusy] = useState<Set<number>>(new Set());
   const settings = useSettings();
   const online = useOnline();
-  const aiReady = (settings.aiMode === 'proxy' ? !!settings.proxyUrl : !!settings.geminiKey) && online;
+  const aiConfigured = settings.aiMode === 'proxy' ? !!settings.proxyUrl : !!settings.geminiKey;
+  const nav = useNavigate();
   /** Ask Gemini for kcal + macros of each named row. Calories you typed are kept; macros are scaled to match them. */
   const aiFill = async (targets: Row[]) => {
+    if (!aiConfigured) {
+      toast('AI needs a free Gemini key. Add it in Settings → AI coach.', 'default', { label: 'Set up', run: () => nav('/settings/ai') });
+      return;
+    }
+    if (!online) return toast("You're offline. AI needs internet.", 'error');
     const todo = targets.filter((r) => r.name.trim());
     if (!todo.length) return toast('Type the food name first, e.g. "2 rotis"', 'error');
     setAiBusy(new Set(todo.map((r) => r.key)));
@@ -143,7 +149,7 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
                 onBlur={() => setTimeout(() => setFocusKey((k) => (k === r.key ? null : k)), 150)}
                 onChange={(e) => set(r.key, { name: e.target.value, foodId: null })}
               />
-              {aiReady && (
+              {(
                 <button
                   aria-label={`Estimate item ${i + 1} with AI`}
                   disabled={aiBusy.size > 0}
@@ -199,19 +205,15 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
           </div>
         );
       })}
-      {aiReady ? (
-        rows.some((r) => r.name.trim()) && (
-          <button
-            className="w-full min-h-[48px] rounded-btn bg-accent/15 font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-            disabled={aiBusy.size > 0}
-            onClick={() => aiFill(rows.filter((r) => r.name.trim() && (r.calories == null || !r.protein)))}
-          >
-            {aiBusy.size ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-            {aiBusy.size ? 'Estimating…' : 'Fill missing kcal and macros with AI'}
-          </button>
-        )
-      ) : (
-        <div className="text-[13px] text-muted text-center">Tip: add a Gemini key in Settings → AI coach and AI can fill calories and macros from the food name.</div>
+      {rows.some((r) => r.name.trim()) && (
+        <button
+          className="w-full min-h-[48px] rounded-btn bg-accent/15 font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+          disabled={aiBusy.size > 0}
+          onClick={() => aiFill(rows.filter((r) => r.name.trim() && (r.calories == null || !r.protein)))}
+        >
+          {aiBusy.size ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+          {aiBusy.size ? 'Estimating…' : 'Fill missing kcal and macros with AI'}
+        </button>
       )}
       <button className="w-full min-h-[48px] rounded-btn border border-dashed border-line font-semibold flex items-center justify-center gap-2 text-muted" onClick={() => setRows([...rows, emptyRow()])}>
         <Plus size={18} /> Add another item

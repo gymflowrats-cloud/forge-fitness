@@ -157,13 +157,14 @@ export default function Onboarding() {
           <>
             <h2 className="text-[24px] font-extrabold">Your goal</h2>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={`Current weight (${wU})`}>
-                <NumberInput value={weight} onChange={setWeight} placeholder="optional" />
+              <Field label={`Current weight (${wU}) *`}>
+                <NumberInput value={weight} onChange={setWeight} placeholder="required" />
               </Field>
               <Field label={`Goal weight (${wU})`}>
                 <NumberInput value={goalWeight} onChange={setGoalWeight} placeholder="optional" />
               </Field>
             </div>
+            <p className="text-muted text-[14px] -mt-2">Your weight is the one thing we need: calorie and protein targets are based on it.</p>
             <div>
               <span className="label">Goal</span>
               <div className="grid grid-cols-2 gap-2">
@@ -227,7 +228,7 @@ export default function Onboarding() {
               Back
             </button>
           )}
-          <button className="btn-primary flex-[2]" onClick={() => (step < 2 ? setStep(step + 1) : finish())}>
+          <button className="btn-primary flex-[2]" disabled={step === 1 && !weight} onClick={() => (step < 2 ? setStep(step + 1) : finish())}>
             {step < 2 ? 'Continue' : 'Build my routine'}
           </button>
         </div>
