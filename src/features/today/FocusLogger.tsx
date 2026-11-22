@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Disc3, Link2, Minus, NotebookPen, Plus, SkipForward, TrendingUp, Trophy, Undo2 } from 'lucide-react';
+import { Check, ChevronRight, Disc3, Link2, Minus, MoreHorizontal, NotebookPen, Plus, SkipForward, TrendingUp, Trophy, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '../../components/Feedback';
 import { celebrate } from '../../components/Celebrate';
@@ -8,12 +8,12 @@ import type { Exercise, ExerciseType, SessionExercise, SetType, WorkoutSet } fro
 import { addSet, applyToOpenWorkingSets, toggleSetComplete, toggleSupersetWithNext, updateSet } from '../../db/workouts';
 import { suggestNext } from '../../lib/progression';
 import { PlateSheet } from './PlateSheet';
+import { SetOptionsSheet } from './SetOptionsSheet';
 import { fmtNum } from '../../lib/format';
 import { dUnit, fromDispD, fromDispW, toDispD, toDispW, wUnit, type Units } from '../../lib/units';
 import { describeSet, describeSets } from './describe';
 import { useRestTimer, vibrate } from './restTimer';
 
-const SET_TYPES: SetType[] = ['working', 'warmup', 'drop', 'failure'];
 const TYPE_LABEL: Record<SetType, string> = { working: 'Working set', warmup: 'Warm-up', drop: 'Drop set', failure: 'To failure' };
 
 /** Big ± control (thumb-sized). Tap the number to type. */
@@ -113,6 +113,7 @@ export function FocusLogger({
   const [noteOpen, setNoteOpen] = useState(false);
   const [pop, setPop] = useState(false);
   const [plates, setPlates] = useState(false);
+  const [optsOpen, setOptsOpen] = useState(false);
   const startRest = useRestTimer((s) => s.start);
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -323,10 +324,10 @@ export function FocusLogger({
           <div className="mt-2 flex items-center justify-between">
             <button
               className="text-[12px] font-bold text-muted min-h-[44px] flex items-center gap-1 whitespace-nowrap min-w-0"
-              onClick={() => updateSet(sel.id, { setType: SET_TYPES[(SET_TYPES.indexOf(sel.setType) + 1) % SET_TYPES.length]! })}
-              aria-label="Change set type"
+              onClick={() => setOptsOpen(true)}
+              aria-label="Set options: change type or delete"
             >
-              SET {selIdx + 1} OF {exSets.length} · <span className={sel.setType === 'working' ? 'text-primary' : 'text-warn'}>{sel.setType === 'working' ? 'Working' : TYPE_LABEL[sel.setType]}</span>
+              SET {selIdx + 1} OF {exSets.length} · <span className={sel.setType === 'working' ? 'text-primary' : 'text-warn'}>{sel.setType === 'working' ? 'Normal' : TYPE_LABEL[sel.setType]}</span> <MoreHorizontal size={14} />
             </button>
             <div className="flex items-center gap-1.5">
             {barbell && (
@@ -387,6 +388,7 @@ export function FocusLogger({
           </div>
         </div>
       ) : null}
+      <SetOptionsSheet set={optsOpen ? sel : null} title={`Set ${selIdx + 1} options`} onClose={() => { setOptsOpen(false); setSelSetId(null); }} />
       <PlateSheet
         open={plates}
         onClose={() => setPlates(false)}

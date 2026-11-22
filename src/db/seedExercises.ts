@@ -13,6 +13,10 @@ const ROWS: Row[] = [
   ['Cable Crossover', 'weight_reps', 'chest', [], 'cable'],
   ['Machine Chest Press', 'weight_reps', 'chest', ['triceps'], 'machine'],
   ['Pec Deck', 'weight_reps', 'chest', [], 'machine'],
+  ['Smith Machine Bench Press', 'weight_reps', 'chest', ['triceps', 'shoulders'], 'machine'],
+  ['Smith Machine Incline Press', 'weight_reps', 'chest', ['shoulders', 'triceps'], 'machine'],
+  ['Decline Cable Fly (High-to-Low)', 'weight_reps', 'chest', [], 'cable'],
+  ['Decline Cable Press', 'weight_reps', 'chest', ['triceps'], 'cable'],
   ['Push-up', 'bodyweight_reps', 'chest', ['triceps', 'shoulders'], 'bodyweight'],
   ['Chest Dip', 'bodyweight_reps', 'chest', ['triceps'], 'bodyweight'],
   // Back

@@ -2,6 +2,7 @@ import { Check, ChevronDown, ChevronUp, MoreHorizontal, NotebookPen, Plus, SkipF
 import { useEffect, useState } from 'react';
 import { Stepper } from '../../components/Controls';
 import { celebrate } from '../../components/Celebrate';
+import { SetOptionsSheet } from './SetOptionsSheet';
 import { toast } from '../../components/Feedback';
 import { BottomSheet, ConfirmSheet } from '../../components/Sheet';
 import { db } from '../../db/db';
@@ -14,7 +15,6 @@ import { describeSet, describeSets } from './describe';
 import { useRestTimer, vibrate } from './restTimer';
 import { SwipeRow } from './SwipeRow';
 
-const SET_TYPES: SetType[] = ['working', 'warmup', 'drop', 'failure'];
 const SET_TYPE_BADGE: Record<SetType, { label: string; cls: string }> = {
   working: { label: '', cls: 'text-ink' },
   warmup: { label: 'W', cls: 'text-warn' },
@@ -67,6 +67,7 @@ export function ExerciseCard({
   const [note, setNote] = useState(se.note);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [popId, setPopId] = useState<string | null>(null);
+  const [optsId, setOptsId] = useState<string | null>(null);
   const startRest = useRestTimer((s) => s.start);
   useEffect(() => {
     setNote(se.note);
@@ -168,12 +169,11 @@ export function ExerciseCard({
                   }}
                 >
                   <button
-                    aria-label={`Set ${i + 1} type: ${s.setType}. Tap to change`}
+                    aria-label={`Set ${i + 1} options`}
                     className={`h-11 rounded-lg font-extrabold text-[15px] ${badge.cls}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const nt = SET_TYPES[(SET_TYPES.indexOf(s.setType) + 1) % SET_TYPES.length]!;
-                      updateSet(s.id, { setType: nt });
+                      setOptsId(s.id);
                     }}
                   >
                     {badge.label || workingIdx}
@@ -259,6 +259,7 @@ export function ExerciseCard({
         </div>
       )}
 
+      <SetOptionsSheet set={sets.find((x) => x.id === optsId) ?? null} title={`Set ${sets.findIndex((x) => x.id === optsId) + 1} options`} onClose={() => setOptsId(null)} />
       <BottomSheet open={menu} onClose={() => setMenu(false)} title={exercise?.name}>
         <div className="space-y-2">
           {!isFirst && (
@@ -277,7 +278,7 @@ export function ExerciseCard({
           <button className="w-full min-h-[52px] rounded-btn bg-card border border-line px-4 flex items-center gap-3 font-semibold text-danger" onClick={() => { setMenu(false); done ? setConfirmRemove(true) : removeSessionExercise(se.id); }}>
             <Trash2 size={20} /> Remove from this workout
           </button>
-          <p className="text-xs text-muted pt-1">These only affect {sessionDate === todayKey() ? 'today' : 'this day'}; your template stays the same. Tap a set number to change its type (W warm-up · D drop · F failure). Swipe a set left to delete it.</p>
+          <p className="text-xs text-muted pt-1">These only affect {sessionDate === todayKey() ? 'today' : 'this day'}; your template stays the same. Tap a set number to change its type or delete it.</p>
         </div>
       </BottomSheet>
       <ConfirmSheet

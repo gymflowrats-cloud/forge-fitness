@@ -116,8 +116,8 @@ export function computeAchievements(i: AchInput): Achievement[] {
   // ---------- Strength (plate milestones; thresholds stored in lb) ----------
   const match = (re: RegExp) => [...i.exerciseNames].filter(([, n]) => re.test(n)).map(([id]) => id);
   const lifts: { key: string; name: string; ids: string[]; steps: [number, number, string][] }[] = [
-    { key: 'bench', name: 'Bench', ids: match(/bench press/i), steps: [[135, 60, '1 plate'], [225, 100, '2 plates'], [315, 140, '3 plates']] },
-    { key: 'squat', name: 'Squat', ids: match(/squat/i).filter((id) => !/split|goblet|hack|jump/i.test(i.exerciseNames.get(id) ?? '')), steps: [[135, 60, '1 plate'], [225, 100, '2 plates'], [315, 140, '3 plates'], [405, 180, '4 plates']] },
+    { key: 'bench', name: 'Bench', ids: match(/bench press/i).filter((id) => !/smith|close-grip|dumbbell|machine/i.test(i.exerciseNames.get(id) ?? '')), steps: [[135, 60, '1 plate'], [225, 100, '2 plates'], [315, 140, '3 plates']] },
+    { key: 'squat', name: 'Squat', ids: match(/squat/i).filter((id) => !/split|goblet|hack|jump|smith/i.test(i.exerciseNames.get(id) ?? '')), steps: [[135, 60, '1 plate'], [225, 100, '2 plates'], [315, 140, '3 plates'], [405, 180, '4 plates']] },
     { key: 'deadlift', name: 'Deadlift', ids: match(/deadlift/i).filter((id) => !/romanian|rdl|stiff/i.test(i.exerciseNames.get(id) ?? '')), steps: [[225, 100, '2 plates'], [315, 140, '3 plates'], [405, 180, '4 plates'], [495, 220, '5 plates']] },
     { key: 'ohp', name: 'Overhead press', ids: match(/overhead press|military press|shoulder press/i).filter((id) => /barbell|military|overhead press$/i.test(i.exerciseNames.get(id) ?? '')), steps: [[95, 40, 'Strict press milestone'], [135, 60, '1 plate']] },
   ];

@@ -77,6 +77,14 @@ export async function setSetting<K extends keyof AppSettings>(key: K, value: App
   await db.settings.put({ key, value });
 }
 
+let onboardedThisSession = false;
+/** Mark onboarding done synchronously so the router gate doesn't bounce back before the DB read updates. */
+export async function completeOnboarding() {
+  onboardedThisSession = true;
+  await setSetting('onboarded', true);
+}
+export const justOnboarded = () => onboardedThisSession;
+
 export async function dismiss(key: string) {
   const s = await getSettings();
   await setSetting('dismissed', { ...s.dismissed, [key]: new Date().toISOString() });

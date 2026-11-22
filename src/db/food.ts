@@ -60,25 +60,66 @@ export async function setLogServings(logId: string, food: Pick<Food, 'calories' 
   });
 }
 
-/** Foods most often logged in this meal over the last `days` days, most frequent first (matched by id or name). */
-export async function frequentForMeal(date: string, meal: string, days = 45, limit = 12): Promise<Food[]> {
-  const logs = await db.foodLogs.where('date').between(shiftKey(date, -days), date, true, true).filter((l) => l.meal === meal).toArray();
-  const foods = await db.foods.toArray();
-  const byId = new Map(foods.map((f) => [f.id, f]));
-  const byName = new Map(foods.map((f) => [f.name.toLowerCase().trim(), f]));
-  const count = new Map<string, number>();
-  for (const l of [...logs].sort((a, b) => b.date.localeCompare(a.date))) {
-    let f = (l.foodId && byId.get(l.foodId)) || byName.get(l.name.toLowerCase().trim());
+const norm = (n: string) => n.toLowerCase().trim().replace(/\s+/g, ' ');
+
+/**
+ * Every food you've ever logged: saved foods plus names that only exist in the log (copied meals, combos,
+ * old entries). Log-only foods get a per-serving entry rebuilt from their latest log and an id of `log:<name>`;
+ * they become real saved foods the first time you add them again.
+ */
+export async function foodCatalog(): Promise<{ foods: Food[]; lastUsed: Map<string, string>; byName: Map<string, Food> }> {
+  const [saved, logs] = await Promise.all([db.foods.toArray(), db.foodLogs.toArray()]);
+  const byName = new Map<string, Food>(saved.map((f) => [norm(f.name), f]));
+  const lastUsed = new Map<string, string>();
+  for (const f of saved) if (f.lastUsedAt) lastUsed.set(f.id, f.lastUsedAt);
+  for (const l of [...logs].sort((x, y) => (y.createdAt ?? y.date).localeCompare(x.createdAt ?? x.date))) {
+    const key = norm(l.name);
+    let f = byName.get(key);
     if (!f) {
-      // Older/imported logs without a saved food: rebuild a per-serving entry from the log (saved on first re-add).
       const n = l.servings || 1;
-      f = { id: `log:${l.name.toLowerCase().trim()}`, name: l.name, servingDesc: '1 serving', calories: Math.round(l.calories / n), protein: r1(l.protein / n), carbs: r1(l.carbs / n), fat: r1(l.fat / n), isFavorite: false, lastUsedAt: null };
-      byId.set(f.id, f);
-      byName.set(l.name.toLowerCase().trim(), f);
+      f = { id: `log:${key}`, name: l.name, servingDesc: '1 serving', calories: Math.round(l.calories / n), protein: r1(l.protein / n), carbs: r1(l.carbs / n), fat: r1(l.fat / n), isFavorite: false, lastUsedAt: null };
+      byName.set(key, f);
     }
-    count.set(f.id, (count.get(f.id) ?? 0) + 1);
+    const when = l.createdAt ?? `${l.date}T12:00:00.000Z`;
+    if ((lastUsed.get(f.id) ?? '') < when) lastUsed.set(f.id, when);
   }
-  return [...count].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => byId.get(id)!);
+  return { foods: [...byName.values()], lastUsed, byName };
+}
+
+/** Word-by-word search over everything logged ("chick bowl" finds "Chicken burrito bowl"); prefix matches first, then most recent. */
+export async function searchFoods(q: string, limit = 40): Promise<Food[]> {
+  const words = norm(q).split(' ').filter(Boolean);
+  if (!words.length) return [];
+  const { foods, lastUsed } = await foodCatalog();
+  const hits = foods.filter((f) => {
+    const n = norm(f.name);
+    return words.every((w) => n.includes(w));
+  });
+  const starts = (f: Food) => (norm(f.name).startsWith(words[0]!) || norm(f.name).includes(' ' + words[0]!) ? 0 : 1);
+  return hits.sort((a, b) => starts(a) - starts(b) || (lastUsed.get(b.id) ?? '').localeCompare(lastUsed.get(a.id) ?? '')).slice(0, limit);
+}
+
+/** Most recently eaten foods, across saved foods and the log. */
+export async function recentFoods(limit = 25): Promise<Food[]> {
+  const { foods, lastUsed } = await foodCatalog();
+  return foods.filter((f) => lastUsed.has(f.id)).sort((a, b) => lastUsed.get(b.id)!.localeCompare(lastUsed.get(a.id)!)).slice(0, limit);
+}
+
+/** Foods most often logged in this meal over the last `days` days, most frequent first. */
+export async function frequentForMeal(date: string, meal: string, days = 45, limit = 12): Promise<Food[]> {
+  const [logs, { byName }] = await Promise.all([
+    db.foodLogs.where('date').between(shiftKey(date, -days), date, true, true).filter((l) => l.meal === meal).toArray(),
+    foodCatalog(),
+  ]);
+  const count = new Map<string, { f: Food; n: number }>();
+  for (const l of logs) {
+    const f = byName.get(norm(l.name));
+    if (!f) continue;
+    const c = count.get(f.id) ?? { f, n: 0 };
+    c.n++;
+    count.set(f.id, c);
+  }
+  return [...count.values()].sort((a, b) => b.n - a.n).slice(0, limit).map((c) => c.f);
 }
 
 export async function saveCombo(name: string, date: string, meal: string) {

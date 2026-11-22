@@ -7,7 +7,7 @@ import { SearchBox } from '../../components/ExercisePicker';
 import { toast } from '../../components/Feedback';
 import { FullSheet } from '../../components/Sheet';
 import { db } from '../../db/db';
-import { frequentForMeal, logCombo, logFood, setLogServings } from '../../db/food';
+import { foodCatalog, frequentForMeal, logCombo, logFood, recentFoods, searchFoods, setLogServings, upsertFood } from '../../db/food';
 import { fmtNum } from '../../lib/format';
 import type { Food, MealCombo } from '../../db/types';
 import { useOnline } from '../../hooks/useOnline';
@@ -81,7 +81,32 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
   const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
   const [focusKey, setFocusKey] = useState<number | null>(null);
   const [fav, setFav] = useState(false);
-  const foods = useLiveQuery(() => db.foods.toArray(), [], [] as Food[]) ?? [];
+  const [aiBusy, setAiBusy] = useState<Set<number>>(new Set());
+  const settings = useSettings();
+  const online = useOnline();
+  const aiReady = (settings.aiMode === 'proxy' ? !!settings.proxyUrl : !!settings.geminiKey) && online;
+  /** Ask Gemini for kcal + macros of each named row. Calories you typed are kept; macros are scaled to match them. */
+  const aiFill = async (targets: Row[]) => {
+    const todo = targets.filter((r) => r.name.trim());
+    if (!todo.length) return toast('Type the food name first, e.g. "2 rotis"', 'error');
+    setAiBusy(new Set(todo.map((r) => r.key)));
+    const results = await Promise.allSettled(todo.map((r) => parseFoodText(r.name.trim())));
+    let failed = 0;
+    results.forEach((res, i) => {
+      const r = todo[i]!;
+      if (res.status !== 'fulfilled' || !res.value.length) { failed++; return; }
+      const sum = res.value.reduce((a, x) => ({ calories: a.calories + x.calories, protein: a.protein + x.protein, carbs: a.carbs + x.carbs, fat: a.fat + x.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      const scale = r.calories && sum.calories ? r.calories / sum.calories : 1;
+      const one = (n: number) => Math.round(n * scale * 10) / 10;
+      set(r.key, { calories: r.calories ?? Math.round(sum.calories), protein: one(sum.protein), carbs: one(sum.carbs), fat: one(sum.fat), macros: true, servingDesc: res.value.length === 1 ? res.value[0]!.servingDesc : r.servingDesc });
+    });
+    setAiBusy(new Set());
+    if (failed) {
+      const first = results.find((x) => x.status === 'rejected') as PromiseRejectedResult | undefined;
+      toast(first?.reason instanceof GeminiError ? first.reason.message : `AI couldn't estimate ${failed} item${failed > 1 ? 's' : ''}`, 'error');
+    }
+  };
+  const foods = useLiveQuery(() => foodCatalog().then((c) => c.foods), [], [] as Food[]) ?? [];
   const set = (key: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const valid = rows.filter((r) => r.calories != null && (r.calories > 0 || r.name.trim()));
   const total = valid.reduce((a, r) => a + (r.calories ?? 0) * r.servings, 0);
@@ -118,6 +143,16 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
                 onBlur={() => setTimeout(() => setFocusKey((k) => (k === r.key ? null : k)), 150)}
                 onChange={(e) => set(r.key, { name: e.target.value, foodId: null })}
               />
+              {aiReady && (
+                <button
+                  aria-label={`Estimate item ${i + 1} with AI`}
+                  disabled={aiBusy.size > 0}
+                  onClick={() => aiFill([r])}
+                  className="h-9 w-9 shrink-0 rounded-full bg-accent/15 text-ink flex items-center justify-center disabled:opacity-50"
+                >
+                  {aiBusy.has(r.key) ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                </button>
+              )}
               {rows.length > 1 && (
                 <button aria-label={`Remove item ${i + 1}`} className="btn-ghost text-muted -mr-1 !min-h-[36px] !min-w-[36px]" onClick={() => setRows(rows.filter((x) => x.key !== r.key))}><X size={18} /></button>
               )}
@@ -164,6 +199,20 @@ function ItemsAdd({ date, meal, onDone }: { date: string; meal: string; onDone: 
           </div>
         );
       })}
+      {aiReady ? (
+        rows.some((r) => r.name.trim()) && (
+          <button
+            className="w-full min-h-[48px] rounded-btn bg-accent/15 font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+            disabled={aiBusy.size > 0}
+            onClick={() => aiFill(rows.filter((r) => r.name.trim() && (r.calories == null || !r.protein)))}
+          >
+            {aiBusy.size ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+            {aiBusy.size ? 'Estimating…' : 'Fill missing kcal and macros with AI'}
+          </button>
+        )
+      ) : (
+        <div className="text-[13px] text-muted text-center">Tip: add a Gemini key in Settings → AI coach and AI can fill calories and macros from the food name.</div>
+      )}
       <button className="w-full min-h-[48px] rounded-btn border border-dashed border-line font-semibold flex items-center justify-center gap-2 text-muted" onClick={() => setRows([...rows, emptyRow()])}>
         <Plus size={18} /> Add another item
       </button>
@@ -263,12 +312,9 @@ function FoodRow({ f, count, onAdd, onMinus, onStar }: { f: Food; count: number;
 function SavedFoods({ date, meal }: { date: string; meal: string }) {
   const [q, setQ] = useState('');
   const usual = useLiveQuery(() => frequentForMeal(date, meal), [date, meal], [] as Food[]) ?? [];
-  const recent = useLiveQuery(() => db.foods.orderBy('lastUsedAt').reverse().limit(25).toArray(), [], [] as Food[]) ?? [];
+  const recent = useLiveQuery(() => recentFoods(), [], [] as Food[]) ?? [];
   const starred = useLiveQuery(() => db.foods.filter((f) => f.isFavorite).toArray().then((l) => l.sort((a, b) => a.name.localeCompare(b.name))), [], [] as Food[]) ?? [];
-  const found = useLiveQuery(
-    () => (q.trim() ? db.foods.filter((f) => q.toLowerCase().trim().split(/\s+/).every((t) => f.name.toLowerCase().includes(t))).limit(40).toArray() : Promise.resolve([] as Food[])),
-    [q], [] as Food[],
-  ) ?? [];
+  const found = useLiveQuery(() => searchFoods(q), [q], [] as Food[]) ?? [];
   const combos = useLiveQuery(() => db.mealCombos.toArray(), [], [] as MealCombo[]) ?? [];
   const [view, setView] = useState<SavedView | null>(null);
   const shown: SavedView = view ?? (usual.length ? 'usual' : recent.length ? 'recent' : 'starred');
@@ -297,7 +343,7 @@ function SavedFoods({ date, meal }: { date: string; meal: string }) {
     setAdded(next);
   };
   const row = (f: Food) => (
-    <FoodRow key={f.id} f={f} count={added[k(f)]?.n ?? 0} onAdd={() => add(f)} onMinus={() => minus(f)} onStar={() => db.foods.update(f.id, { isFavorite: !f.isFavorite })} />
+    <FoodRow key={f.id} f={f} count={added[k(f)]?.n ?? 0} onAdd={() => add(f)} onMinus={() => minus(f)} onStar={() => (f.id.startsWith('log:') ? upsertFood({ ...f, foodId: null }, true) : db.foods.update(f.id, { isFavorite: !f.isFavorite }))} />
   );
   const addedTotal = Object.entries(added).filter(([key]) => key.startsWith(`${meal}:`)).length;
 

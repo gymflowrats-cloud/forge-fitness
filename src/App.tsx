@@ -7,7 +7,7 @@ import { TabBar } from './components/Layout';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/db';
 import { initDb } from './db/init';
-import { getSettings } from './db/settings';
+import { getSettings, justOnboarded } from './db/settings';
 import { useSettings } from './hooks/useData';
 import { setLook, setTheme, type Palette } from './lib/theme';
 import { autoSync } from './services/googleHealth';
@@ -37,7 +37,8 @@ function Shell({ onboarded }: { onboarded: boolean }) {
   const settings = useSettings();
   // Live flag (undefined while loading) so finishing onboarding is picked up immediately.
   const live = useLiveQuery(() => db.settings.get('onboarded').then((r) => !!r?.value), []);
-  const isOnboarded = live ?? onboarded;
+  // justOnboarded() covers the gap between saving the flag and the live query noticing it.
+  const isOnboarded = justOnboarded() || (live ?? onboarded);
   useEffect(() => {
     setTheme(settings.theme);
   }, [settings.theme]);

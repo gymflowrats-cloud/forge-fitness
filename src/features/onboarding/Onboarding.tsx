@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Field, NumberInput, SegmentedControl } from '../../components/Controls';
 import { db } from '../../db/db';
-import { setSetting } from '../../db/settings';
+import { completeOnboarding } from '../../db/settings';
 import type { Profile } from '../../db/types';
 import { suggestTargets, type Activity, type Goal, type Sex } from '../../lib/calc';
 import { todayKey } from '../../lib/dates';
@@ -23,12 +23,12 @@ export default function Onboarding() {
   const nav = useNavigate();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const [sex, setSex] = useState<Sex>('male');
-  const [age, setAge] = useState<number | null>(30);
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [age, setAge] = useState<number | null>(null);
   const [units, setUnits] = useState<Units>('imperial');
-  const [heightFt, setHeightFt] = useState<number | null>(5);
-  const [heightInPart, setHeightInPart] = useState<number | null>(10);
-  const [heightCm, setHeightCm] = useState<number | null>(178);
+  const [heightFt, setHeightFt] = useState<number | null>(null);
+  const [heightInPart, setHeightInPart] = useState<number | null>(null);
+  const [heightCm, setHeightCm] = useState<number | null>(null);
   const [weight, setWeight] = useState<number | null>(null);
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
   const [goal, setGoal] = useState<Goal>('recomp');
@@ -38,7 +38,16 @@ export default function Onboarding() {
   const heightIn = units === 'imperial' ? (heightFt ?? 0) * 12 + (heightInPart ?? 0) : fromDispL(heightCm ?? 0, 'metric');
   const weightLb = weight ? fromDispW(weight, units) : 0;
   const targets = useMemo(
-    () => (weightLb && heightIn && age ? suggestTargets({ sex, weightLb, heightIn, age, activity, goal }) : null),
+    () => {
+      if (!weightLb) return null;
+      // Missing details fall back to typical values; sex not given = average of both formulas.
+      const base = { weightLb, heightIn: heightIn || 68, age: age || 30, activity, goal };
+      if (sex) return suggestTargets({ ...base, sex });
+      const m = suggestTargets({ ...base, sex: 'male' });
+      const f = suggestTargets({ ...base, sex: 'female' });
+      const avg = (a: number, b: number) => Math.round((a + b) / 20) * 10;
+      return { calories: avg(m.calories, f.calories), protein: m.protein, carbs: Math.round((m.carbs + f.carbs) / 2), fat: Math.round((m.fat + f.fat) / 2), tdee: Math.round((m.tdee + f.tdee) / 2) };
+    },
     [sex, weightLb, heightIn, age, activity, goal],
   );
 
@@ -51,7 +60,7 @@ export default function Onboarding() {
     const profile: Profile = {
       id: 'me',
       name: name.trim() || 'Athlete',
-      sex,
+      sex: sex ?? 'male',
       birthYear: new Date().getFullYear() - (age ?? 30),
       heightIn: heightIn || 70,
       units,
@@ -72,7 +81,7 @@ export default function Onboarding() {
       const existing = await db.bodyWeights.where('date').equals(d).first();
       await db.bodyWeights.put({ id: existing?.id ?? uid(), date: d, weight: weightLb });
     }
-    await setSetting('onboarded', true);
+    await completeOnboarding();
     nav('/settings/routines?welcome=1', { replace: true });
   }
 
@@ -101,7 +110,10 @@ export default function Onboarding() {
       <div className="flex-1 px-5 pt-6 pb-8 max-w-md w-full mx-auto space-y-5">
         {step === 0 && (
           <>
-            <h2 className="text-[24px] font-extrabold">About you</h2>
+            <div>
+              <h2 className="text-[24px] font-extrabold">About you</h2>
+              <p className="text-muted text-[14px] mt-1">Everything here is optional. It's only used to suggest calorie and protein targets.</p>
+            </div>
             <Field label="Name">
               <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="given-name" />
             </Field>
@@ -113,22 +125,28 @@ export default function Onboarding() {
               />
             </Field>
             <Field label="Sex">
-              <SegmentedControl options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} value={sex} onChange={setSex} />
+              <div className="grid grid-cols-2 gap-2">
+                {(['male', 'female'] as Sex[]).map((x) => (
+                  <button key={x} onClick={() => setSex(sex === x ? null : x)} className={`min-h-[48px] rounded-btn border font-bold ${sex === x ? 'bg-primary text-white border-primary' : 'bg-card border-line'}`}>
+                    {x === 'male' ? 'Male' : 'Female'}
+                  </button>
+                ))}
+              </div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Age">
-                <NumberInput value={age} onChange={setAge} decimal={false} />
+                <NumberInput value={age} onChange={setAge} decimal={false} placeholder="—" />
               </Field>
               {units === 'imperial' ? (
                 <Field label="Height (ft / in)">
                   <div className="flex gap-2">
-                    <NumberInput value={heightFt} onChange={setHeightFt} decimal={false} ariaLabel="Feet" />
-                    <NumberInput value={heightInPart} onChange={setHeightInPart} ariaLabel="Inches" />
+                    <NumberInput value={heightFt} onChange={setHeightFt} decimal={false} ariaLabel="Feet" placeholder="ft" />
+                    <NumberInput value={heightInPart} onChange={setHeightInPart} ariaLabel="Inches" placeholder="in" />
                   </div>
                 </Field>
               ) : (
                 <Field label="Height (cm)">
-                  <NumberInput value={heightCm} onChange={setHeightCm} />
+                  <NumberInput value={heightCm} onChange={setHeightCm} placeholder="cm" />
                 </Field>
               )}
             </div>
@@ -140,7 +158,7 @@ export default function Onboarding() {
             <h2 className="text-[24px] font-extrabold">Your goal</h2>
             <div className="grid grid-cols-2 gap-3">
               <Field label={`Current weight (${wU})`}>
-                <NumberInput value={weight} onChange={setWeight} placeholder="0" />
+                <NumberInput value={weight} onChange={setWeight} placeholder="optional" />
               </Field>
               <Field label={`Goal weight (${wU})`}>
                 <NumberInput value={goalWeight} onChange={setGoalWeight} placeholder="optional" />
@@ -189,7 +207,7 @@ export default function Onboarding() {
                 goal, we suggest:
               </p>
             ) : (
-              <p className="text-muted">Add your weight and height to get a suggestion. You can change these any time in Settings.</p>
+              <p className="text-muted">Add your current weight for a personal suggestion. You can change these any time in Settings.</p>
             )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Calories (kcal)">
