@@ -143,3 +143,27 @@ cloudflare-worker/  optional Gemini proxy
 ```
 
 Data is stored in canonical units (lb, inches, miles) and converted for display, so switching between lb/in and kg/cm is lossless. Schema changes must add a new `db.version(n)` with an upgrade function in `src/db/db.ts`. Never edit an existing version.
+
+## Meal reminders (push notifications)
+
+Reminders at breakfast, lunch, snack and dinner time arrive even when Forge is closed. Because a web app can't
+schedule its own notifications, a tiny free **Cloudflare Worker** (`push-worker/`) sends them: every 5 minutes it
+checks which phones have a meal time in that slot and sends a Web Push. It stores only each phone's push address,
+meal times and time zone. No food, body or workout data.
+
+One-time setup (needs a free Cloudflare account):
+
+```bash
+npm run push:setup
+```
+
+This logs in to Cloudflare, creates the storage, deploys the Worker, uploads the signing key (kept locally in
+`push-worker/.vapid.json`, git-ignored) and writes `src/pushConfig.json`. Commit that file and push to deploy.
+
+Then on each phone: install Forge (iPhone needs iOS 16.4+ and **Add to Home Screen**), open **Settings → Meal
+reminders** and turn them on. Default times: breakfast 8:30, lunch 13:00, snacks 16:30, dinner 20:00.
+
+## Installing on Android
+
+Open the site in Chrome → ⋮ menu → **Install app** (or **Add to Home screen**). Settings also shows an
+"Install Forge" button that opens Chrome's install dialog directly.

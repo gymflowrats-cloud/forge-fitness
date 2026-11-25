@@ -9,3 +9,6 @@ dev-dist
 # personal screenshots (contain private finance info)
 design-reference/
 *.tsbuildinfo
+
+# push signing key (private)
+push-worker/.vapid.json

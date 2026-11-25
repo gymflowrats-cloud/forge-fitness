@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BookmarkPlus, CopyPlus, GlassWater, Minus, MoreHorizontal, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { HeroCard } from '../../components/Card';
 import { NumberInput, ProgressBar, Stepper } from '../../components/Controls';
 import { AlertRow, toast } from '../../components/Feedback';
@@ -52,6 +53,15 @@ export default function Food() {
     setMeal(m ?? defaultMealForNow(s.meals));
     setAdding(true);
   };
+  // Opened from a meal reminder notification (#/food?meal=Lunch): jump straight into adding to that meal.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const m = params.get('meal');
+    if (!m) return;
+    setParams({}, { replace: true });
+    setDate(todayKey());
+    openAdd(m);
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const macros = [
     { k: 'Protein', v: t.protein, g: p?.proteinG ?? 150 },

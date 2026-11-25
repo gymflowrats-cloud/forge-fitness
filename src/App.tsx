@@ -11,6 +11,7 @@ import { getSettings, justOnboarded } from './db/settings';
 import { useSettings } from './hooks/useData';
 import { setLook, setTheme, type Palette } from './lib/theme';
 import { autoSync } from './services/googleHealth';
+import { refreshRemindersOnOpen } from './services/push';
 const Onboarding = lazy(() => import('./features/onboarding/Onboarding'));
 import Today from './features/today/Today';
 import Food from './features/food/Food';
@@ -19,6 +20,7 @@ const Stats = lazy(() => import('./features/stats/Stats'));
 const Coach = lazy(() => import('./features/coach/Coach'));
 const Achievements = lazy(() => import('./features/achievements/Achievements'));
 const WeeklyRecap = lazy(() => import('./features/recap/WeeklyRecap'));
+const RemindersSettings = lazy(() => import('./features/settings/RemindersSettings'));
 import { AchievementWatcher } from './features/achievements/AchievementWatcher';
 import SettingsHome from './features/settings/SettingsHome';
 import ProfileSettings from './features/settings/ProfileSettings';
@@ -54,6 +56,9 @@ function Shell({ onboarded }: { onboarded: boolean }) {
   }, [loc.pathname]);
   // Pull fresh Fitbit data on open and whenever the app comes back to the foreground.
   useEffect(() => {
+    refreshRemindersOnOpen();
+  }, []);
+  useEffect(() => {
     autoSync();
     const onVis = () => document.visibilityState === 'visible' && autoSync();
     document.addEventListener('visibilitychange', onVis);
@@ -83,6 +88,7 @@ function Shell({ onboarded }: { onboarded: boolean }) {
         <Route path="/settings/backup" element={<Backup />} />
         <Route path="/settings/developer" element={<Developer />} />
         <Route path="/settings/health" element={<HealthSettings />} />
+        <Route path="/settings/reminders" element={<RemindersSettings />} />
         <Route path="/settings/reset" element={<ResetData />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>

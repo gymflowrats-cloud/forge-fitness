@@ -34,12 +34,14 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,woff2,webmanifest}'],
         navigateFallback: 'index.html',
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Meal-reminder push + notification-tap handling (public/push-sw.js).
+        importScripts: ['push-sw.js'],
       },
     }),
   ],
   server: { host: false },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'push-worker/**/*.test.js'],
   },
 });

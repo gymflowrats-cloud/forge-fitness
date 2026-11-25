@@ -32,6 +32,11 @@ export interface AppSettings {
   celebrations: boolean;
   /** Achievement ids already celebrated, so each one pops only once. */
   seenAchievements: string[];
+  /** Meal reminder push notifications (needs the push Worker, see push-worker/). */
+  mealReminders: boolean;
+  /** Meal name → "HH:MM" ('' = off). Missing meals use defaultMealTime(). */
+  mealTimes: Record<string, string>;
+  lastPushSync: string | null;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -59,7 +64,23 @@ export const DEFAULT_SETTINGS: AppSettings = {
   heroTexture: true,
   celebrations: true,
   seenAchievements: [],
+  mealReminders: false,
+  mealTimes: {},
+  lastPushSync: null,
 };
+
+const DEFAULT_MEAL_TIMES: Record<string, string> = { breakfast: '08:30', lunch: '13:00', snack: '16:30', snacks: '16:30', dinner: '20:00' };
+/** Sensible default reminder time for common meal names (null for custom meals). */
+export const defaultMealTime = (meal: string): string | null => DEFAULT_MEAL_TIMES[meal.toLowerCase().trim()] ?? null;
+/** The reminder schedule actually used: user times, else defaults. Custom meals without a time are skipped. */
+export function effectiveMealTimes(meals: string[], custom: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of meals) {
+    const t = m in custom ? custom[m] : defaultMealTime(m); // '' = reminder turned off for this meal
+    if (t) out[m] = t;
+  }
+  return out;
+}
 
 /** Keys never included in JSON backups. */
 export const PRIVATE_SETTING_KEYS: (keyof AppSettings)[] = ['geminiKey'];
