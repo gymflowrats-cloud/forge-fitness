@@ -66,7 +66,16 @@ async function main() {
   const publicKey = b64u(Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, 'base64url'), Buffer.from(jwk.y, 'base64url')]));
 
   step(4, 'Deploy the Worker');
-  const out = await wrangler(['deploy']);
+  let out;
+  try {
+    out = await wrangler(['deploy']);
+  } catch (e) {
+    // New accounts must pick a free workers.dev name once; wrangler can't ask when its output is captured.
+    throw new Error(
+      'If the error above says "register a workers.dev subdomain": open the dashboard link it printed, pick any name ' +
+        '(e.g. your name), click Set up, wait a minute, then run `npm run push:setup` again. Finished steps are skipped.',
+    );
+  }
   const url = /https:\/\/[\w.-]+\.workers\.dev/.exec(out)?.[0];
   if (!url) throw new Error('Deployed, but could not find the workers.dev URL in the output above.');
   await wrangler(['secret', 'put', 'VAPID_PRIVATE_JWK'], { input: JSON.stringify(jwk) });
